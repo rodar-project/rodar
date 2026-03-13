@@ -82,7 +82,7 @@ defmodule Rodar.Conformance.ExecutionTest do
         TestHelper.execute_from_start(elements, %{"flag_a" => true, "flag_b" => true})
 
       assert {:ok, _} = result
-      TestHelper.assert_visited(context, ["Task_A", "Task_B"])
+      TestHelper.assert_visited(context, ["Task_A", "Task_B", "IGW_Join", "End_1"])
       TestHelper.assert_not_visited(context, ["Task_C"])
     end
 
@@ -94,7 +94,7 @@ defmodule Rodar.Conformance.ExecutionTest do
         TestHelper.execute_from_start(elements, %{"flag_a" => true, "flag_b" => false})
 
       assert {:ok, _} = result
-      TestHelper.assert_visited(context, ["Task_A"])
+      TestHelper.assert_visited(context, ["Task_A", "IGW_Join", "End_1"])
       TestHelper.assert_not_visited(context, ["Task_B", "Task_C"])
     end
 
@@ -106,7 +106,7 @@ defmodule Rodar.Conformance.ExecutionTest do
         TestHelper.execute_from_start(elements, %{"flag_a" => false, "flag_b" => false})
 
       assert {:ok, _} = result
-      TestHelper.assert_visited(context, ["Task_C"])
+      TestHelper.assert_visited(context, ["Task_C", "IGW_Join", "End_1"])
       TestHelper.assert_not_visited(context, ["Task_A", "Task_B"])
     end
   end
