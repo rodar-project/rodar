@@ -95,8 +95,12 @@ context[:data]
 ## Service Task Handlers
 
 Service tasks use the `Rodar.Activity.Task.Service.Handler` behaviour.
-Handlers receive task attributes and current context data, and return a result
-map that gets merged into context data.
+Handlers receive task attributes and current context data. Four return types:
+
+- `{:ok, map()}` — result merged into context data, token released
+- `{:error, reason}` — error propagated to caller
+- `{:bpmn_error, code, message}` — routes to error boundary event if attached, else `{:error, message}`
+- `{:async, reference}` — parks the token, returns `{:manual, _}`; resume with `complete_async/3`
 
 ```elixir
 # GOOD: Implement the Handler behaviour
@@ -154,6 +158,82 @@ end
 # No handler_map, no TaskRegistry entry — this service task does nothing
 Rodar.Registry.register("order_process", process)
 {:ok, pid} = Rodar.Process.create_and_run("order_process", %{})
+```
+
+### BPMN Error Propagation
+
+Service handlers can throw BPMN errors that route to attached error boundary
+events. This implements the BPMN 2.0 error event semantics for service tasks.
+
+```elixir
+# GOOD: Return {:bpmn_error, code, message} to trigger error boundary
+defmodule MyApp.ValidateOrder do
+  @behaviour Rodar.Activity.Task.Service.Handler
+
+  @impl true
+  def execute(_attrs, data) do
+    case validate(data) do
+      :ok -> {:ok, %{validated: true}}
+      {:error, reason} -> {:bpmn_error, "VALIDATION_ERROR", reason}
+    end
+  end
+end
+
+# The BPMN diagram should have an error boundary event attached to the
+# service task. The engine will route the token to the boundary's outgoing
+# flows when {:bpmn_error, _, _} is returned.
+
+# If no error boundary is attached, the error propagates as {:error, message}
+
+# BAD: Using {:error, reason} when you want BPMN error boundary routing
+def execute(_attrs, data) do
+  # This will NOT trigger the boundary event — it just returns an error
+  {:error, "validation failed"}
+end
+
+# BAD: Raising an exception instead of returning {:bpmn_error, ...}
+def execute(_attrs, _data) do
+  raise "validation failed"  # Crashes the process, no boundary routing
+end
+```
+
+### Async Service Tasks
+
+Handlers can return `{:async, reference}` to indicate the work will complete
+asynchronously (e.g., external API calls, webhooks). The process suspends and
+can be resumed later.
+
+```elixir
+# GOOD: Return {:async, ref} for external work
+defmodule MyApp.SendEmail do
+  @behaviour Rodar.Activity.Task.Service.Handler
+
+  @impl true
+  def execute(attrs, data) do
+    job_id = EmailService.send_async(data["to"], data["body"])
+    {:async, job_id}
+  end
+end
+
+# GOOD: Resume with complete_async when the external work finishes
+context = Rodar.Process.get_context(pid)
+Rodar.Activity.Task.Service.complete_async(context, "Task_send_email", %{
+  sent: true,
+  message_id: "msg-456"
+})
+
+# GOOD: Use the Workflow convenience function
+Rodar.Workflow.complete_async_service(pid, "Task_send_email", %{sent: true})
+
+# BAD: Using resume_user_task for async service tasks
+Rodar.Workflow.resume_user_task(pid, "Task_send_email", %{sent: true})
+# => {:error, "Task 'Task_send_email' is :bpmn_activity_task_service, not a user task"}
+
+# BAD: Forgetting to complete the async task — process stays suspended forever
+def execute(_attrs, data) do
+  SomeService.fire_and_forget(data)
+  {:async, "ref"}  # If nothing ever calls complete_async, the process hangs
+end
 ```
 
 ## Custom Task Handlers

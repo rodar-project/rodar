@@ -37,6 +37,7 @@ defmodule Rodar.Workflow do
       Rodar.Workflow.resume_user_task(pid, "Task_Approval", %{"approved" => true})
   """
 
+  alias Rodar.Activity.Task.Service
   alias Rodar.Activity.Task.User, as: UserTask
   alias Rodar.Context
   alias Rodar.Engine.Diagram
@@ -126,6 +127,20 @@ defmodule Rodar.Workflow do
       {type, _attrs} ->
         {:error, "Task '#{task_id}' is #{type}, not a user task"}
     end
+  end
+
+  @doc """
+  Complete an async service task on a process instance.
+
+  Looks up the context for the process and delegates to
+  `Rodar.Activity.Task.Service.complete_async/3`.
+
+  Returns the result of `Service.complete_async/3`.
+  """
+  @spec complete_async_service(pid(), String.t(), map()) :: Rodar.result() | {:error, String.t()}
+  def complete_async_service(pid, task_id, result) when is_map(result) do
+    context = Process.get_context(pid)
+    Service.complete_async(context, task_id, result)
   end
 
   @doc """
@@ -239,6 +254,11 @@ defmodule Rodar.Workflow do
       end
 
       @doc false
+      def complete_async_service(pid, task_id, result) do
+        Rodar.Workflow.complete_async_service(pid, task_id, result)
+      end
+
+      @doc false
       def process_status(pid) do
         Rodar.Workflow.process_status(pid)
       end
@@ -257,6 +277,7 @@ defmodule Rodar.Workflow do
                      start_process: 0,
                      start_process: 1,
                      resume_user_task: 3,
+                     complete_async_service: 3,
                      process_status: 1,
                      process_data: 1,
                      process_history: 1

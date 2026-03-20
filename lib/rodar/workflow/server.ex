@@ -114,6 +114,14 @@ defmodule Rodar.Workflow.Server do
       end
 
       @doc false
+      def complete_service_task(instance_id, task_id, result) do
+        GenServer.call(
+          __MODULE__,
+          {:__workflow__, :complete_service_task, instance_id, task_id, result}
+        )
+      end
+
+      @doc false
       def list_instances do
         GenServer.call(__MODULE__, {:__workflow__, :list_instances})
       end
@@ -189,6 +197,35 @@ defmodule Rodar.Workflow.Server do
         end
       end
 
+      def handle_call(
+            {:__workflow__, :complete_service_task, instance_id, task_id, result},
+            _from,
+            state
+          ) do
+        case Map.fetch(state.instances, instance_id) do
+          {:ok, instance} ->
+            case Rodar.Workflow.complete_async_service(
+                   instance.process_pid,
+                   task_id,
+                   result
+                 ) do
+              {:error, _} = error ->
+                {:reply, error, state}
+
+              _result ->
+                status = Rodar.Workflow.process_status(instance.process_pid)
+                mapped = unquote(__MODULE__).__apply_map_status__(__MODULE__, status)
+
+                updated = %{instance | status: mapped}
+                instances = Map.put(state.instances, instance_id, updated)
+                {:reply, {:ok, updated}, %{state | instances: instances}}
+            end
+
+          :error ->
+            {:reply, {:error, :not_found}, state}
+        end
+      end
+
       def handle_call({:__workflow__, :list_instances}, _from, state) do
         sorted =
           state.instances
@@ -210,6 +247,7 @@ defmodule Rodar.Workflow.Server do
                      create_instance: 0,
                      create_instance: 1,
                      complete_task: 3,
+                     complete_service_task: 3,
                      list_instances: 0,
                      get_instance: 1,
                      init: 1,

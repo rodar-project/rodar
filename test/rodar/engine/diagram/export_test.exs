@@ -348,6 +348,65 @@ defmodule Rodar.Engine.Diagram.ExportTest do
       assert xml =~ ~s(calledElement="other_process")
     end
 
+    test "exports service task with implementation attribute" do
+      diagram =
+        diagram_with_element(
+          "task1",
+          {:bpmn_activity_task_service,
+           %{
+             id: "task1",
+             name: "Call API",
+             implementation: "##WebService",
+             incoming: ["f1"],
+             outgoing: ["f2"]
+           }}
+        )
+
+      xml = Export.to_xml(diagram)
+      assert xml =~ "<bpmn2:serviceTask"
+      assert xml =~ ~s(implementation="##WebService")
+      assert xml =~ ~s(name="Call API")
+    end
+
+    test "exports service task without implementation when absent" do
+      diagram =
+        diagram_with_element(
+          "task1",
+          {:bpmn_activity_task_service,
+           %{
+             id: "task1",
+             name: "Svc",
+             incoming: ["f1"],
+             outgoing: ["f2"]
+           }}
+        )
+
+      xml = Export.to_xml(diagram)
+      assert xml =~ "<bpmn2:serviceTask"
+      refute xml =~ "implementation="
+    end
+
+    test "strips :handler from service task export" do
+      diagram =
+        diagram_with_element(
+          "task1",
+          {:bpmn_activity_task_service,
+           %{
+             id: "task1",
+             name: "Svc",
+             implementation: "##WebService",
+             handler: SomeModule,
+             incoming: ["f1"],
+             outgoing: ["f2"]
+           }}
+        )
+
+      xml = Export.to_xml(diagram)
+      assert xml =~ ~s(implementation="##WebService")
+      refute xml =~ "handler"
+      refute xml =~ "SomeModule"
+    end
+
     test "exports receive task with messageRef" do
       diagram =
         diagram_with_element(

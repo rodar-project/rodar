@@ -54,6 +54,7 @@ defmodule Rodar.Engine.Diagram.Export do
   @internal_keys ~w(
     _elems incoming outgoing elements script conditionExpression
     ioSpecification dataInputAssociation dataOutputAssociation
+    handler
     messageEventDefinition signalEventDefinition errorEventDefinition
     escalationEventDefinition compensateEventDefinition terminateEventDefinition
     timerEventDefinition conditionalEventDefinition
@@ -560,6 +561,14 @@ defmodule Rodar.Engine.Diagram.Export do
   defp build_task_attrs(:bpmn_activity_subprocess, attrs) do
     attrs
     |> Map.take([:id, :name, :calledElement])
+    |> filter_exportable_attrs()
+    |> sort_attrs()
+    |> build_attrs()
+  end
+
+  defp build_task_attrs(:bpmn_activity_task_service, attrs) do
+    attrs
+    |> Map.take([:id, :name, :implementation])
     |> filter_exportable_attrs()
     |> sort_attrs()
     |> build_attrs()

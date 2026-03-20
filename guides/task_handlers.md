@@ -109,7 +109,62 @@ The `execute/2` callback receives:
 - `attrs` -- the BPMN element attribute map (including `:id`, `:name`, `:outgoing`, etc.)
 - `data` -- the current process data map (from `Rodar.Context.get(context, :data)`)
 
-Return `{:ok, result_map}` to merge keys into the context data, or `{:error, reason}` to signal failure.
+The `execute/2` callback supports four return types:
+
+- `{:ok, result_map}` -- merge keys into context data, release token to outgoing flows
+- `{:error, reason}` -- signal failure, error propagates to caller
+- `{:bpmn_error, error_code, message}` -- throw a BPMN error; if an error boundary event is attached to the service task, the token routes there. Otherwise falls back to `{:error, message}`
+- `{:async, reference}` -- park the token and return `{:manual, _}` to suspend the process. Use `Rodar.Activity.Task.Service.complete_async/3` or `Rodar.Workflow.complete_async_service/3` to resume later
+
+### BPMN Error Propagation
+
+A handler can throw a BPMN error that routes to an attached error boundary event:
+
+```elixir
+defmodule MyApp.ValidateOrder do
+  @behaviour Rodar.Activity.Task.Service.Handler
+
+  @impl true
+  def execute(_attrs, data) do
+    case validate(data) do
+      :ok -> {:ok, %{validated: true}}
+      {:error, reason} -> {:bpmn_error, "VALIDATION_ERROR", reason}
+    end
+  end
+end
+```
+
+When `{:bpmn_error, code, message}` is returned, the engine stores the error info in context meta (`:error`, `:error_code`, `:error_message`) and searches for an error boundary event attached to the service task. If found, the token is released to the boundary's outgoing flows. If no error boundary is attached, the error falls back to `{:error, message}`.
+
+### Async Service Tasks
+
+For external integrations (webhooks, queued jobs), return `{:async, reference}` to suspend the process:
+
+```elixir
+defmodule MyApp.SendEmail do
+  @behaviour Rodar.Activity.Task.Service.Handler
+
+  @impl true
+  def execute(_attrs, data) do
+    job_id = EmailService.send_async(data["to"], data["body"])
+    {:async, job_id}
+  end
+end
+```
+
+The process suspends (returns `{:manual, _}`) with the async reference stored in context meta. When the external work completes, resume with:
+
+```elixir
+# Direct API
+context = Rodar.Process.get_context(pid)
+Rodar.Activity.Task.Service.complete_async(context, "Task_send_email", %{sent: true})
+
+# Workflow convenience function
+Rodar.Workflow.complete_async_service(pid, "Task_send_email", %{sent: true})
+
+# Workflow.Server
+MyApp.OrderManager.complete_service_task(instance_id, "Task_send_email", %{sent: true})
+```
 
 ### Wiring Service Handlers
 
