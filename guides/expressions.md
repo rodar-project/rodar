@@ -34,7 +34,7 @@ The two languages differ in how they access process data:
 
 ## FEEL Syntax
 
-FEEL is provided by the standalone [`rodar_feel`](https://hex.pm/packages/rodar_feel) package (`RodarFeel`). It supports arithmetic (`+`, `-`, `*`, `/`), comparisons (`>`, `<`, `>=`, `<=`, `=`, `!=`), boolean operators (`and`, `or`, `not`), string concatenation (`+`), path access (`order.total`), bracket access (`items[0]`), if-then-else, the `in` operator (lists and ranges), list literals, and function calls including space-separated names.
+FEEL is provided by the standalone [`rodar_feel`](https://hex.pm/packages/rodar_feel) package (`RodarFeel`). It supports arithmetic (`+`, `-`, `*`, `/`, `%`, `**`), comparisons (`>`, `<`, `>=`, `<=`, `=`, `!=`), boolean operators (`and`, `or`, `not`), string concatenation (`+`), path access (`order.total`), bracket access (`items[0]`, `map["key"]`), if-then-else, the `in` operator (lists and ranges), `between X and Y` range checks, list literals, context literals (`{a: 1, b: a + 1}` with sequential evaluation), `for-in-return` iteration, quantified expressions (`some`/`every ... satisfies`), `instance of` type checking, user-defined functions (lambdas with closures), function calls including space-separated names, and comments (`//` single-line, `/* */` multi-line).
 
 ```elixir
 # Via the Rodar wrapper (used internally by the engine)
@@ -47,18 +47,140 @@ RodarFeel.eval("x in [1, 2, 3]", %{"x" => 2})
 
 RodarFeel.eval("string length(name)", %{"name" => "Alice"})
 # => {:ok, 5}
+
+# Between operator
+RodarFeel.eval("age between 18 and 65", %{"age" => 30})
+# => {:ok, true}
+
+# Context literals with sequential evaluation
+RodarFeel.eval("{base: price, tax: base * 0.1}", %{"price" => 100})
+# => {:ok, %{"base" => 100, "tax" => 10.0}}
+
+# For-in-return iteration
+RodarFeel.eval("for x in items return x * 2", %{"items" => [1, 2, 3]})
+# => {:ok, [2, 4, 6]}
+
+# Quantified expressions
+RodarFeel.eval("some x in scores satisfies x > 90", %{"scores" => [70, 85, 95]})
+# => {:ok, true}
+```
+
+## Temporal Types
+
+FEEL has built-in support for dates, times, datetimes, and durations using the `@"..."` literal syntax. These can also be constructed via built-in functions.
+
+```elixir
+# Date literals
+RodarFeel.eval(~s|@"2024-03-20"|, %{})
+# => {:ok, ~D[2024-03-20]}
+
+# Time literals
+RodarFeel.eval(~s|@"10:30:00"|, %{})
+# => {:ok, ~T[10:30:00]}
+
+# DateTime literals (with timezone)
+RodarFeel.eval(~s|@"2024-03-20T10:30:00Z"|, %{})
+# => {:ok, ~U[2024-03-20 10:30:00Z]}
+
+# Duration literals
+RodarFeel.eval(~s|@"P1Y2M"|, %{})
+# => {:ok, %RodarFeel.Duration{years: 1, months: 2, ...}}
+
+# Temporal arithmetic
+RodarFeel.eval(~s|@"2024-03-20" + @"P1M"|, %{})
+# => {:ok, ~D[2024-04-20]}
+
+# Property access on temporal values
+RodarFeel.eval("d.year", %{"d" => ~D[2024-03-20]})
+# => {:ok, 2024}
+
+# Properties: .year, .month, .day, .hour, .minute, .second, .timezone, .offset
+
+# Built-in temporal functions
+RodarFeel.eval("today()", %{})
+# => {:ok, ~D[...]}  (current date)
+
+RodarFeel.eval("now()", %{})
+# => {:ok, ...}  (current datetime)
+
+# Constructing from components
+RodarFeel.eval(~s|date and time(@"2024-03-20", @"10:30:00")|, %{})
+# => {:ok, ~N[2024-03-20 10:30:00]}
+```
+
+## User-Defined Functions (Lambdas)
+
+FEEL supports defining anonymous functions with closure capture:
+
+```elixir
+# Define and invoke a lambda
+RodarFeel.eval("{add: function(x, y) x + y, result: add(3, 4)}", %{})
+# => {:ok, %{"add" => {:feel_function, ...}, "result" => 7}}
+
+# Closures capture bindings at definition time
+RodarFeel.eval("{base: 10, add_base: function(x) x + base, result: add_base(5)}", %{})
+# => {:ok, %{"base" => 10, "add_base" => {:feel_function, ...}, "result" => 15}}
+```
+
+## Instance of Type Checking
+
+The `instance of` operator checks a value's type at runtime:
+
+```elixir
+RodarFeel.eval("x instance of number", %{"x" => 42})
+# => {:ok, true}
+
+RodarFeel.eval("x instance of string", %{"x" => 42})
+# => {:ok, false}
+
+# Supported types: number, string, boolean, date, time, date and time,
+# years and months duration, days and time duration, list, context, null, any
+```
+
+## DMN Unary Tests
+
+The `eval_unary/3` function evaluates DMN-style unary test expressions against an input value. Useful for decision table cells:
+
+```elixir
+# Comparison tests
+RodarFeel.eval_unary("< 100", 50, %{})
+# => {:ok, true}
+
+# Range tests (inclusive/exclusive brackets)
+RodarFeel.eval_unary("[1..5]", 3, %{})
+# => {:ok, true}
+
+RodarFeel.eval_unary("(1..5)", 1, %{})
+# => {:ok, false}  (exclusive)
+
+# Disjunction (match any)
+RodarFeel.eval_unary("1, 2, 3", 2, %{})
+# => {:ok, true}
+
+# Negation
+RodarFeel.eval_unary("not(< 100)", 150, %{})
+# => {:ok, true}
+
+# Wildcard (matches anything)
+RodarFeel.eval_unary("-", "anything", %{})
+# => {:ok, true}
 ```
 
 ## Built-in FEEL Functions
 
 | Category | Functions |
 |----------|-----------|
-| Numeric | `abs(n)`, `floor(n)`, `ceiling(n)`, `round(n)`, `round(n, scale)`, `min(list)`, `max(list)`, `sum(list)`, `count(list)` |
-| String | `string length(s)`, `contains(s, sub)`, `starts with(s, prefix)`, `ends with(s, suffix)`, `upper case(s)`, `lower case(s)`, `substring(s, start)`, `substring(s, start, length)` |
-| Boolean | `not(b)` |
+| Numeric | `abs(n)`, `floor(n)`, `ceiling(n)`, `round(n)`, `round(n, scale)`, `min(list)`, `max(list)`, `sum(list)`, `count(list)`, `product(list)`, `mean(list)` |
+| String | `string length(s)`, `contains(s, sub)`, `starts with(s, prefix)`, `ends with(s, suffix)`, `upper case(s)`, `lower case(s)`, `substring(s, start)`, `substring(s, start, length)`, `split(s, delimiter)`, `substring before(s, match)`, `substring after(s, match)`, `replace(s, pattern, replacement)`, `trim(s)`, `string join(list)`, `string join(list, separator)`, `matches(s, pattern)` |
+| Boolean | `not(b)`, `all(list)`, `any(list)` |
 | Null | `is null(v)` |
+| List | `append(list, item)`, `concatenate(list1, list2, ...)`, `reverse(list)`, `flatten(list)`, `distinct values(list)`, `sort(list)`, `index of(list, match)`, `list contains(list, element)` |
+| Conversion | `string(value)`, `number(s)`, `number(s, grouping, decimal)` |
+| Temporal | `date(s)`, `time(s)`, `date and time(s)`, `date and time(date, time)`, `duration(s)`, `now()`, `today()` |
+| Statistical | `median(list)`, `stddev(list)`, `mode(list)` |
+| Misc | `random()` |
 
-All functions propagate `nil` -- if any argument is `nil`, the result is `nil`. The exceptions are `is null` (returns `true` for `nil`) and `not` (returns `nil` for `nil`).
+All functions propagate `nil` -- if any argument is `nil`, the result is `nil`. The exceptions are `is null` (returns `true` for `nil`), `not` (returns `nil` for `nil`), `all` and `any` (three-valued boolean logic: `all([true, nil])` returns `nil`, `all([false, nil])` returns `false`), and `string` (returns `nil` for `nil`).
 
 ## Elixir Sandbox
 

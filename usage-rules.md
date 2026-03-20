@@ -269,11 +269,75 @@ as a dependency. They have different binding conventions.
 # GOOD: Elixir expressions access data through the "data" binding
 # In BPMN XML: <conditionExpression language="elixir">data["count"] > 5</conditionExpression>
 
+# GOOD: FEEL supports temporal literals and arithmetic in conditions
+# <conditionExpression language="feel">due_date < today()</conditionExpression>
+# <conditionExpression language="feel">age >= @"P18Y"</conditionExpression>
+
+# GOOD: FEEL supports instance of for type-based routing
+# <conditionExpression language="feel">amount instance of number</conditionExpression>
+
 # BAD: Using Elixir syntax in a FEEL expression
 # language="feel": data["count"] > 5  — FEEL doesn't have data["..."] syntax
 
 # BAD: Using FEEL syntax in an Elixir expression
 # language="elixir": count > 5  — "count" is not bound; use data["count"]
+
+# BAD: Expecting FEEL eval to raise — it returns {:ok, _} or {:error, _} tuples
+result = RodarFeel.eval("1 + 2", %{})
+# result is {:ok, 3}, not 3
+# Note: Rodar.Expression.evaluate/3 does raise on {:error, _} internally
+
+# BAD: Using atom keys exclusively — FEEL uses string keys canonically
+RodarFeel.eval("count > 5", %{count: 10})
+# Works via flex_get, but string keys take precedence and are the convention
+# Prefer: %{"count" => 10}
+```
+
+### FEEL Temporal Types
+
+FEEL has built-in date, time, datetime, and duration support. These are useful
+in timer conditions, deadline checks, and date-based routing.
+
+```elixir
+# GOOD: Use @"..." literals for temporal values in FEEL expressions
+# Dates, times, datetimes, and durations all use the @"..." syntax
+RodarFeel.eval(~s|@"2024-03-20" + @"P1M"|, %{})
+# => {:ok, ~D[2024-04-20]}
+
+# GOOD: Pass Elixir temporal values as bindings
+RodarFeel.eval("due_date < today()", %{"due_date" => ~D[2024-01-15]})
+# => {:ok, true}
+
+# GOOD: Access temporal properties
+RodarFeel.eval("order_date.year", %{"order_date" => ~D[2024-03-20]})
+# => {:ok, 2024}
+# Available properties: .year, .month, .day, .hour, .minute, .second,
+# .timezone, .offset
+
+# GOOD: Use temporal built-in functions
+# now(), today(), date(s), time(s), date and time(s), duration(s)
+
+# BAD: Using Elixir date syntax in FEEL — use @"..." or built-in functions
+# ~D[2024-03-20] works as a binding value, but not as a literal in FEEL text
+```
+
+### FEEL User-Defined Functions
+
+FEEL supports lambdas with closures for reusable logic within expressions.
+
+```elixir
+# GOOD: Define functions in context literals for reuse
+RodarFeel.eval("""
+{
+  discount: function(price, rate) price * rate,
+  final: price - discount(price, 0.1)
+}
+""", %{"price" => 100})
+# => {:ok, %{"discount" => {:feel_function, ...}, "final" => 90.0}}
+
+# BAD: Expecting FEEL functions to be Elixir functions
+# {:feel_function, params, body_ast, closure} is an internal representation
+# You cannot call them from Elixir — only from within FEEL expressions
 ```
 
 ## Persistence
