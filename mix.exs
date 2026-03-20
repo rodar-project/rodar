@@ -54,7 +54,7 @@ defmodule Rodar.MixProject do
       {:excoveralls, "~> 0.18", only: [:dev, :test], runtime: false},
       {:jason, "~> 1.4"},
       {:erlsom, "~> 1.5"},
-      {:nimble_parsec, "~> 1.4"},
+      {:rodar_feel, path: "../feel"},
       {:telemetry, "~> 1.2"},
       {:rodar_release, github: "rodar-project/rodar_release", only: :dev, runtime: false}
     ]
@@ -139,9 +139,6 @@ defmodule Rodar.MixProject do
           Rodar.Expression,
           Rodar.Expression.Sandbox,
           Rodar.Expression.Feel,
-          Rodar.Expression.Feel.Parser,
-          Rodar.Expression.Feel.Evaluator,
-          Rodar.Expression.Feel.Functions,
           Rodar.Validation,
           Rodar.Collaboration,
           Rodar.SequenceFlow

@@ -34,16 +34,18 @@ The two languages differ in how they access process data:
 
 ## FEEL Syntax
 
-FEEL supports arithmetic (`+`, `-`, `*`, `/`), comparisons (`>`, `<`, `>=`, `<=`, `=`, `!=`), boolean operators (`and`, `or`, `not`), string concatenation (`+`), path access (`order.total`), bracket access (`items[0]`), if-then-else, the `in` operator (lists and ranges), list literals, and function calls including space-separated names.
+FEEL is provided by the standalone [`rodar_feel`](https://hex.pm/packages/rodar_feel) package (`RodarFeel`). It supports arithmetic (`+`, `-`, `*`, `/`), comparisons (`>`, `<`, `>=`, `<=`, `=`, `!=`), boolean operators (`and`, `or`, `not`), string concatenation (`+`), path access (`order.total`), bracket access (`items[0]`), if-then-else, the `in` operator (lists and ranges), list literals, and function calls including space-separated names.
 
 ```elixir
+# Via the Rodar wrapper (used internally by the engine)
 Rodar.Expression.Feel.eval("if x > 10 then \"high\" else \"low\"", %{"x" => 15})
 # => {:ok, "high"}
 
-Rodar.Expression.Feel.eval("x in [1, 2, 3]", %{"x" => 2})
+# Or directly via the standalone package
+RodarFeel.eval("x in [1, 2, 3]", %{"x" => 2})
 # => {:ok, true}
 
-Rodar.Expression.Feel.eval("string length(name)", %{"name" => "Alice"})
+RodarFeel.eval("string length(name)", %{"name" => "Alice"})
 # => {:ok, 5}
 ```
 

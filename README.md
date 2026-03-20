@@ -354,7 +354,7 @@ The engine uses a **token-based execution model**. A `Rodar.Token` struct tracks
 - **`Rodar.Process`** — Process lifecycle GenServer. Create instances, activate, suspend, resume, terminate. Tracks status transitions.
 - **`Rodar.Expression`** — Evaluates condition expressions on sequence flows. Routes to the Elixir sandbox or FEEL evaluator based on language.
 - **`Rodar.Expression.Sandbox`** — AST-restricted Elixir expression evaluator (replaces `Code.eval_string`).
-- **`Rodar.Expression.Feel`** — FEEL (Friendly Enough Expression Language) evaluator. NimbleParsec-based parser with null propagation, three-valued boolean logic, and built-in functions.
+- **`Rodar.Expression.Feel`** — FEEL (Friendly Enough Expression Language) evaluator. Delegates to the standalone [`rodar_feel`](https://hex.pm/packages/rodar_feel) package which provides a NimbleParsec-based parser with null propagation, three-valued boolean logic, and built-in functions.
 - **`Rodar.Engine.Diagram`** — Parses BPMN 2.0 XML via `erlsom`. Extracts lane sets into process attrs (`:lane_set`). `load/2` accepts `:handler_map`, `:bpmn_file`, `:app_name`, and `:discover_handlers` options. When `:bpmn_file` and `:app_name` are provided, convention-based handler auto-discovery is enabled by default.
 - **`Rodar.Event.Bus`** — Registry-based pub/sub for BPMN events (message, signal, escalation).
 - **`Rodar.Event.Timer`** — ISO 8601 duration parsing and timer scheduling.

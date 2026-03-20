@@ -78,10 +78,7 @@ Return tuples: `{:ok, context}`, `{:error, msg}`, `{:manual, _}`, `{:fatal, _}`,
 - **`Rodar.Compensation`** — Tracks completed activities and their compensation handlers. `register_handler/3`, `compensate_activity/2` (targeted), `compensate_all/1` (reverse order), `remove_handlers/2` (cleanup on failure). Pre-registered in `Rodar.execute/3` for activities with compensation boundary events.
 - **`Rodar.Expression`** — Evaluates condition expressions on sequence flows. Routes to `"elixir"` (Sandbox) or `"feel"` (FEEL) evaluator based on language tag. Accepts both `{:bpmn_expression, {lang, expr}}` and legacy `{:bpmn_condition_expression, %{...}}` formats.
 - **`Rodar.Expression.Sandbox`** — AST-restricted Elixir expression evaluator. Parses via `Code.string_to_quoted`, walks AST against an allowlist, evaluates safe expressions via `Code.eval_quoted`. Prevents arbitrary code execution.
-- **`Rodar.Expression.Feel`** — FEEL (Friendly Enough Expression Language) facade. Parses and evaluates FEEL expressions via `eval/2`. FEEL bindings receive the raw data map directly (users write `count > 5`, not `data["count"] > 5`).
-- **`Rodar.Expression.Feel.Parser`** — NimbleParsec-based FEEL parser producing AST tuples. Supports arithmetic, comparisons, boolean operators, paths, bracket access, if-then-else, in operator (list/range), function calls (including space-separated names like `string length`), and list literals.
-- **`Rodar.Expression.Feel.Evaluator`** — Tree-walking evaluator for FEEL AST. Implements null propagation, three-valued boolean logic, string concatenation via `+`, and path resolution in nested maps.
-- **`Rodar.Expression.Feel.Functions`** — Built-in FEEL functions: numeric (`abs`, `floor`, `ceiling`, `round`, `min`, `max`, `sum`, `count`), string (`string length`, `contains`, `starts with`, `ends with`, `upper case`, `lower case`, `substring`), boolean (`not`), null (`is null`). Null propagation for all except `is null` and `not`.
+- **`Rodar.Expression.Feel`** — Thin delegation wrapper to the `rodar_feel` package (`RodarFeel`). FEEL (Friendly Enough Expression Language) is provided by the standalone `rodar_feel` dependency, which includes `RodarFeel` (facade), `RodarFeel.Parser` (NimbleParsec-based parser), `RodarFeel.Evaluator` (tree-walking evaluator with null propagation and three-valued boolean logic), and `RodarFeel.Functions` (built-in FEEL functions).
 - **`Rodar.Expression.ScriptEngine`** — Behaviour for pluggable script language engines. Single `eval/2` callback receiving script text and bindings map, returning `{:ok, result}` or `{:error, reason}`.
 - **`Rodar.Expression.ScriptRegistry`** — GenServer for script engine registrations. `register/2` (language string → module), `unregister/1`, `lookup/1`, `list/0`. Used by `Activity.Task.Script` to resolve languages beyond built-in `"elixir"` and `"feel"`.
 - **`Rodar.Expression.TestHelpers`** — Convenience functions for evaluating expressions against sample data without a full process context, and for validating expression safety.
@@ -116,7 +113,7 @@ Return tuples: `{:ok, context}`, `{:error, msg}`, `{:manual, _}`, `{:fatal, _}`,
 - `lib/rodar/activity/` — Tasks (user, script, service, send, receive, manual) and subprocesses (embedded, call activity)
 - `lib/rodar/event/` — Start, end, intermediate (throw/catch), boundary events, event bus, timer utilities
 - `lib/rodar/gateway/` — Exclusive, parallel, inclusive, complex, event-based gateways
-- `lib/rodar/expression/` — Sandboxed Elixir evaluator, FEEL evaluator (`feel/` subdirectory), pluggable script engine behaviour and registry, and test helpers
+- `lib/rodar/expression/` — Sandboxed Elixir evaluator, FEEL delegation wrapper (implementation in `rodar_feel` package), pluggable script engine behaviour and registry, and test helpers
 - `lib/rodar/persistence/` — Persistence behaviour, serializer, and adapters (ETS)
 - `lib/rodar/telemetry/` — Telemetry event definitions, helpers, and default log handler
 - `lib/rodar/observability.ex` — Dashboard query APIs and health checks

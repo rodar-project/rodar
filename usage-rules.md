@@ -257,8 +257,9 @@ Rodar.Event.Bus.publish(:message, "payment", %{
 
 ## Expressions
 
-BPMN condition expressions support two languages: FEEL and Elixir. They have
-different binding conventions.
+BPMN condition expressions support two languages: FEEL and Elixir. FEEL is
+provided by the standalone `rodar_feel` package (`RodarFeel`), which is included
+as a dependency. They have different binding conventions.
 
 ```elixir
 # GOOD: FEEL expressions receive data directly — write naturally
