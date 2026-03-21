@@ -62,6 +62,8 @@ defmodule Rodar.Engine.Diagram.Export do
     timeDuration timeCycle timeDate
     condition condition_language
     lane_set
+    loop_characteristics
+    handler
   )a
 
   @doc """
@@ -607,7 +609,8 @@ defmodule Rodar.Engine.Diagram.Export do
       build_incoming_outgoing(attrs, depth),
       build_io_specification(attrs, depth),
       build_data_associations(attrs, depth),
-      build_script(attrs, depth)
+      build_script(attrs, depth),
+      build_loop_characteristics(attrs, depth)
     ]
   end
 
@@ -615,7 +618,8 @@ defmodule Rodar.Engine.Diagram.Export do
     [
       build_incoming_outgoing(attrs, depth),
       build_io_specification(attrs, depth),
-      build_data_associations(attrs, depth)
+      build_data_associations(attrs, depth),
+      build_loop_characteristics(attrs, depth)
     ]
   end
 
@@ -623,7 +627,8 @@ defmodule Rodar.Engine.Diagram.Export do
     [
       build_incoming_outgoing(attrs, depth),
       build_properties(attrs, depth),
-      build_data_associations(attrs, depth)
+      build_data_associations(attrs, depth),
+      build_loop_characteristics(attrs, depth)
     ]
   end
 
@@ -790,6 +795,67 @@ defmodule Rodar.Engine.Diagram.Export do
     end
   end
 
+  # --- Loop Characteristics ---
+
+  defp build_loop_characteristics(attrs, depth) do
+    case Map.get(attrs, :loop_characteristics) do
+      nil ->
+        []
+
+      %{type: :multi_instance} = loop ->
+        build_multi_instance_loop(loop, depth)
+
+      %{type: :standard_loop} = loop ->
+        build_standard_loop(loop, depth)
+
+      _ ->
+        []
+    end
+  end
+
+  defp build_multi_instance_loop(loop, depth) do
+    xml_attrs =
+      [
+        {"isSequential", non_empty(loop[:isSequential])},
+        {"loopDataInputRef", non_empty(loop[:loopDataInputRef])},
+        {"loopDataOutputRef", non_empty(loop[:loopDataOutputRef])}
+      ]
+      |> build_attrs()
+
+    children = [
+      build_loop_child("bpmn2:loopCardinality", loop[:loopCardinality], depth + 1),
+      build_loop_child("bpmn2:completionCondition", loop[:completionCondition], depth + 1),
+      build_loop_data_item("bpmn2:inputDataItem", loop[:inputDataItem], depth + 1),
+      build_loop_data_item("bpmn2:outputDataItem", loop[:outputDataItem], depth + 1)
+    ]
+
+    tag("bpmn2:multiInstanceLoopCharacteristics", xml_attrs, children, depth)
+  end
+
+  defp build_standard_loop(loop, depth) do
+    xml_attrs =
+      [
+        {"testBefore", non_empty(loop[:testBefore])},
+        {"loopMaximum", non_empty(loop[:loopMaximum])}
+      ]
+      |> build_attrs()
+
+    self_closing_tag("bpmn2:standardLoopCharacteristics", xml_attrs, depth)
+  end
+
+  defp build_loop_child(_tag_name, nil, _depth), do: []
+
+  defp build_loop_child(tag_name, value, depth) do
+    text_tag(tag_name, "", value, depth)
+  end
+
+  defp build_loop_data_item(_tag_name, nil, _depth), do: []
+
+  defp build_loop_data_item(tag_name, name, depth) do
+    xml_attrs = build_attrs([{"name", name}])
+    self_closing_tag(tag_name, xml_attrs, depth)
+  end
+
   # --- Embedded Subprocess ---
 
   defp build_subprocess(attrs, depth) do
@@ -804,6 +870,7 @@ defmodule Rodar.Engine.Diagram.Export do
 
     children = [
       build_incoming_outgoing(attrs, depth + 1),
+      build_loop_characteristics(attrs, depth + 1),
       build_process_elements(elements, depth + 1)
     ]
 

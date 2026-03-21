@@ -1002,3 +1002,73 @@ Link catch events are passive targets — when reached via normal token flow
 # Link events are intra-process only. For cross-process communication,
 # use message events with the event bus instead.
 ```
+
+## Multi-Instance Activities
+
+Multi-instance activities execute a task or subprocess multiple times based on
+BPMN `multiInstanceLoopCharacteristics`. The engine handles this transparently —
+any activity type supports multi-instance without handler changes.
+
+```elixir
+# GOOD: Define multi-instance in BPMN XML — no handler changes needed
+# <bpmn:serviceTask id="Task_Send_Emails" name="Send Email">
+#   <bpmn:multiInstanceLoopCharacteristics isSequential="true" loopDataInputRef="recipients">
+#     <bpmn:inputDataItem name="recipient"/>
+#     <bpmn:outputDataItem name="send_results"/>
+#   </bpmn:multiInstanceLoopCharacteristics>
+# </bpmn:serviceTask>
+
+# GOOD: Service handler reads the loop variable naturally — no MI awareness needed
+defmodule MyApp.SendEmail do
+  @behaviour Rodar.Activity.Task.Service.Handler
+
+  @impl true
+  def execute(_attrs, data) do
+    recipient = Map.get(data, "recipient")
+    result = Mailer.send(recipient)
+    {:ok, %{"_mi_current_result" => result}}
+  end
+end
+
+# GOOD: Use loopCardinality for a fixed number of iterations
+# <bpmn:multiInstanceLoopCharacteristics>
+#   <bpmn:loopCardinality>3</bpmn:loopCardinality>
+# </bpmn:multiInstanceLoopCharacteristics>
+
+# GOOD: Use completionCondition for early termination (FEEL expression)
+# <bpmn:multiInstanceLoopCharacteristics isSequential="true">
+#   <bpmn:loopCardinality>100</bpmn:loopCardinality>
+#   <bpmn:completionCondition>loopCounter >= 5</bpmn:completionCondition>
+# </bpmn:multiInstanceLoopCharacteristics>
+
+# GOOD: Store per-iteration results via _mi_current_result
+def execute(_attrs, data) do
+  counter = Map.get(data, "loopCounter")
+  {:ok, %{"_mi_current_result" => "processed_#{counter}"}}
+end
+# Results collected into the outputDataItem variable (or "_mi_results" by default)
+
+# BAD: Trying to manage multi-instance logic inside the handler
+defmodule MyApp.BadMIHandler do
+  @behaviour Rodar.Activity.Task.Service.Handler
+
+  @impl true
+  def execute(_attrs, data) do
+    items = Map.get(data, "items", [])
+    # Don't loop manually — let BPMN multi-instance handle it!
+    results = Enum.map(items, &process/1)
+    {:ok, %{results: results}}
+  end
+end
+
+# BAD: Multi-instance without loopCardinality or loopDataInputRef
+# Validation will reject this — one of them is required
+# <bpmn:multiInstanceLoopCharacteristics isSequential="true">
+#   <!-- Missing loopCardinality AND loopDataInputRef -->
+# </bpmn:multiInstanceLoopCharacteristics>
+
+# BAD: Forgetting to set the input collection in context data
+# When using loopDataInputRef, the collection must exist in context data
+{:ok, pid} = Rodar.Process.create_and_run("my_process", %{})
+# If loopDataInputRef="items" but "items" is not in data → error
+```
