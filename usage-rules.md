@@ -669,6 +669,49 @@ MyApp.OrderManager.complete_task(1, "Wrong_Task", %{})
 # Returns {:error, "Task 'Wrong_Task' not found in process"} — handle it!
 ```
 
+## Transaction Subprocesses
+
+Transaction subprocesses (`bpmn2:transaction`) extend embedded subprocess
+semantics with cancel/compensation behavior. When a cancel end event fires
+inside a transaction, scoped compensation runs (only activities within the
+transaction) and the cancel boundary event on the transaction fires.
+
+```elixir
+# GOOD: Transaction subprocess in BPMN XML uses <bpmn:transaction> tag
+# It is parsed as :bpmn_activity_subprocess_transaction
+xml = """
+<bpmn:transaction id="Txn_1" name="Book Trip">
+  <bpmn:startEvent id="Txn_Start"><bpmn:outgoing>F1</bpmn:outgoing></bpmn:startEvent>
+  <bpmn:task id="Book_Hotel"><bpmn:incoming>F1</bpmn:incoming><bpmn:outgoing>F2</bpmn:outgoing></bpmn:task>
+  <bpmn:endEvent id="Cancel_End"><bpmn:incoming>F2</bpmn:incoming><bpmn:cancelEventDefinition/></bpmn:endEvent>
+  <bpmn:sequenceFlow id="F1" sourceRef="Txn_Start" targetRef="Book_Hotel"/>
+  <bpmn:sequenceFlow id="F2" sourceRef="Book_Hotel" targetRef="Cancel_End"/>
+</bpmn:transaction>
+<bpmn:boundaryEvent id="Cancel_Boundary" attachedToRef="Txn_1">
+  <bpmn:outgoing>F3</bpmn:outgoing>
+  <bpmn:cancelEventDefinition/>
+</bpmn:boundaryEvent>
+"""
+
+# GOOD: Use Compensation.compensate_scope/2 for transaction-scoped compensation
+# Only compensates activities within the transaction, not the whole process
+Rodar.Compensation.compensate_scope(context, ["Book_Hotel", "Book_Flight"])
+
+# GOOD: Use Compensation.compensate_all/1 for global compensation
+Rodar.Compensation.compensate_all(context)
+
+# BAD: Using compensate_all when inside a transaction — compensates parent too
+# Cancel end events automatically use scoped compensation via the transaction scope
+
+# BAD: Confusing <bpmn:subProcess> with <bpmn:transaction>
+# subProcess → :bpmn_activity_subprocess_embeded (no cancel semantics)
+# transaction → :bpmn_activity_subprocess_transaction (cancel + scoped compensation)
+
+# BAD: Using cancelEventDefinition outside a transaction subprocess
+# Cancel end events only make sense inside a transaction
+# Cancel boundary events only make sense attached to a transaction
+```
+
 ## Lanes (Role/Group Assignment)
 
 Lanes are structural metadata that assign flow nodes to roles, groups, or

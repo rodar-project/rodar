@@ -74,8 +74,8 @@ Return tuples: `{:ok, context}`, `{:error, msg}`, `{:manual, _}`, `{:fatal, _}`,
 - **`Rodar.Event.Timer`** — ISO 8601 duration parsing (`parse_duration/1`), cycle parsing (`parse_cycle/1` for `R3/PT10S`, `R/PT1M`, bare durations), `schedule/4` via `Process.send_after`, `schedule_cycle/5` for repeating timers, `cancel/1`.
 - **`Rodar.Event.Intermediate.Throw`** — Publishes message/signal/escalation to event bus, releases token.
 - **`Rodar.Event.Intermediate.Catch`** — Subscribes to event bus, schedules timer, or subscribes to conditional evaluation; returns `{:manual, _}`. Fires immediately if condition is already true. Has `resume/3`.
-- **`Rodar.Event.Boundary`** — Full implementation: error (direct activation), message/signal/escalation (event bus), timer (scheduled), conditional (context subscription, fires on data change), compensate (passive — registration in dispatcher).
-- **`Rodar.Compensation`** — Tracks completed activities and their compensation handlers. `register_handler/3`, `compensate_activity/2` (targeted), `compensate_all/1` (reverse order), `remove_handlers/2` (cleanup on failure). Pre-registered in `Rodar.execute/3` for activities with compensation boundary events.
+- **`Rodar.Event.Boundary`** — Full implementation: error (direct activation), message/signal/escalation (event bus), timer (scheduled), conditional (context subscription, fires on data change), compensate (passive — registration in dispatcher), cancel (activated by transaction subprocess on cancel end event).
+- **`Rodar.Compensation`** — Tracks completed activities and their compensation handlers. `register_handler/3`, `compensate_activity/2` (targeted), `compensate_all/1` (reverse order), `compensate_scope/2` (scoped to transaction — only compensates activities within the given scope), `remove_handlers/2` (cleanup on failure). Pre-registered in `Rodar.execute/3` for activities with compensation boundary events.
 - **`Rodar.Expression`** — Evaluates condition expressions on sequence flows. Routes to `"elixir"` (Sandbox) or `"feel"` (FEEL) evaluator based on language tag. Accepts both `{:bpmn_expression, {lang, expr}}` and legacy `{:bpmn_condition_expression, %{...}}` formats.
 - **`Rodar.Expression.Sandbox`** — AST-restricted Elixir expression evaluator. Parses via `Code.string_to_quoted`, walks AST against an allowlist, evaluates safe expressions via `Code.eval_quoted`. Prevents arbitrary code execution.
 - **`Rodar.Expression.Feel`** — FEEL (Friendly Enough Expression Language) facade. Parses and evaluates FEEL expressions via `eval/2`. FEEL bindings receive the raw data map directly (users write `count > 5`, not `data["count"] > 5`).
@@ -113,7 +113,7 @@ Return tuples: `{:ok, context}`, `{:error, msg}`, `{:manual, _}`, `{:fatal, _}`,
 
 ### Module Organization
 
-- `lib/rodar/activity/` — Tasks (user, script, service, send, receive, manual) and subprocesses (embedded, call activity)
+- `lib/rodar/activity/` — Tasks (user, script, service, send, receive, manual) and subprocesses (embedded, transaction, call activity)
 - `lib/rodar/event/` — Start, end, intermediate (throw/catch), boundary events, event bus, timer utilities
 - `lib/rodar/gateway/` — Exclusive, parallel, inclusive, complex, event-based gateways
 - `lib/rodar/expression/` — Sandboxed Elixir evaluator, FEEL evaluator (`feel/` subdirectory), pluggable script engine behaviour and registry, and test helpers

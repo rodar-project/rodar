@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_15" name="Transaction" isExecutable="true">
+    <bpmn:startEvent id="Start_1" name="Start">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:transaction id="Txn_1" name="Book Trip">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+      <bpmn:startEvent id="Txn_Start" name="Txn Start">
+        <bpmn:outgoing>Flow_2</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:task id="Task_Book" name="Book Hotel">
+        <bpmn:incoming>Flow_2</bpmn:incoming>
+        <bpmn:outgoing>Flow_3</bpmn:outgoing>
+      </bpmn:task>
+      <bpmn:endEvent id="Txn_Cancel_End" name="Cancel Booking">
+        <bpmn:incoming>Flow_3</bpmn:incoming>
+        <bpmn:cancelEventDefinition/>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_2" sourceRef="Txn_Start" targetRef="Task_Book"/>
+      <bpmn:sequenceFlow id="Flow_3" sourceRef="Task_Book" targetRef="Txn_Cancel_End"/>
+    </bpmn:transaction>
+    <bpmn:boundaryEvent id="Boundary_Cancel" attachedToRef="Txn_1">
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:cancelEventDefinition/>
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="End_Cancelled" name="Cancelled">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="End_OK" name="OK">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_1" targetRef="Txn_1"/>
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Boundary_Cancel" targetRef="End_Cancelled"/>
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Txn_1" targetRef="End_OK"/>
+  </bpmn:process>
+</bpmn:definitions>

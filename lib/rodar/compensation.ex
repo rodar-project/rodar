@@ -71,6 +71,33 @@ defmodule Rodar.Compensation do
   end
 
   @doc """
+  Execute compensation handlers scoped to a transaction.
+
+  Only compensates activities whose IDs are in the given `scope` (a MapSet
+  or list of activity IDs). Handlers are executed in reverse completion order.
+  Returns `{:ok, context}` after all scoped handlers have executed.
+  """
+  @spec compensate_scope(pid(), MapSet.t() | [String.t()]) :: Rodar.result()
+  def compensate_scope(context, scope) do
+    scope_set =
+      case scope do
+        %MapSet{} -> scope
+        list when is_list(list) -> MapSet.new(list)
+      end
+
+    context
+    |> handlers()
+    |> Enum.filter(&MapSet.member?(scope_set, &1.activity_id))
+    |> Enum.sort_by(& &1.registered_at, :desc)
+    |> Enum.reduce({:ok, context}, fn handler, acc ->
+      case acc do
+        {:ok, _} -> execute_handler(context, handler)
+        error -> error
+      end
+    end)
+  end
+
+  @doc """
   Remove all compensation handlers registered for a specific activity.
 
   Called when an activity fails, to undo the pre-registration.
