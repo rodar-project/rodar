@@ -160,10 +160,12 @@ defmodule Rodar.Engine.Diagram do
     %{result | processes: updated_processes}
   end
 
+  @handler_injectable_types [:bpmn_activity_task_service, :bpmn_activity_task_business_rule]
+
   defp inject_handlers_into_elements(elements, handler_map) do
     Map.new(elements, fn
-      {id, {:bpmn_activity_task_service, attrs}} ->
-        {id, maybe_inject_handler({:bpmn_activity_task_service, attrs}, id, handler_map)}
+      {id, {type, attrs}} when type in @handler_injectable_types ->
+        {id, maybe_inject_handler({type, attrs}, id, handler_map)}
 
       {id, {:bpmn_activity_subprocess_embeded, %{elements: nested} = attrs}}
       when is_map(nested) ->
@@ -175,10 +177,10 @@ defmodule Rodar.Engine.Diagram do
     end)
   end
 
-  defp maybe_inject_handler({:bpmn_activity_task_service, attrs}, id, handler_map) do
+  defp maybe_inject_handler({type, attrs}, id, handler_map) do
     case Map.fetch(handler_map, id) do
-      {:ok, handler} -> {:bpmn_activity_task_service, Map.put(attrs, :handler, handler)}
-      :error -> {:bpmn_activity_task_service, attrs}
+      {:ok, handler} -> {type, Map.put(attrs, :handler, handler)}
+      :error -> {type, attrs}
     end
   end
 
@@ -473,6 +475,14 @@ defmodule Rodar.Engine.Diagram do
   defp load_element("bpmn2:serviceTask", attrs, elems),
     do:
       {:bpmn_activity_task_service,
+       Map.merge(attrs, %{
+         incoming: load_elements("bpmn2:incoming", elems),
+         outgoing: load_elements("bpmn2:outgoing", elems)
+       })}
+
+  defp load_element("bpmn2:businessRuleTask", attrs, elems),
+    do:
+      {:bpmn_activity_task_business_rule,
        Map.merge(attrs, %{
          incoming: load_elements("bpmn2:incoming", elems),
          outgoing: load_elements("bpmn2:outgoing", elems)

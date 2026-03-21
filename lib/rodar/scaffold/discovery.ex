@@ -145,15 +145,17 @@ defmodule Rodar.Scaffold.Discovery do
     end)
   end
 
+  @handler_injectable_types [:bpmn_activity_task_service, :bpmn_activity_task_business_rule]
+
   defp inject_into_elements(elements, handler_map) do
     Map.new(elements, fn
-      {id, {:bpmn_activity_task_service, attrs}} ->
+      {id, {type, attrs}} when type in @handler_injectable_types ->
         case Map.fetch(handler_map, id) do
           {:ok, handler} ->
-            {id, {:bpmn_activity_task_service, Map.put(attrs, :handler, handler)}}
+            {id, {type, Map.put(attrs, :handler, handler)}}
 
           :error ->
-            {id, {:bpmn_activity_task_service, attrs}}
+            {id, {type, attrs}}
         end
 
       {id, {:bpmn_activity_subprocess_embeded, %{elements: nested} = attrs}}

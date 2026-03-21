@@ -34,6 +34,7 @@ defmodule Rodar.Scaffold do
 
   @task_types [
     :bpmn_activity_task_service,
+    :bpmn_activity_task_business_rule,
     :bpmn_activity_task_user,
     :bpmn_activity_task_send,
     :bpmn_activity_task_receive,
@@ -164,6 +165,10 @@ defmodule Rodar.Scaffold do
     {Rodar.Activity.Task.Service.Handler, :execute, "execute(_attrs, _data)"}
   end
 
+  def behaviour_for_type(:bpmn_activity_task_business_rule) do
+    {Rodar.Activity.Task.BusinessRule.Handler, :execute, "execute(_attrs, _data)"}
+  end
+
   def behaviour_for_type(_type) do
     {Rodar.TaskHandler, :token_in, "token_in(_element, _context)"}
   end
@@ -176,6 +181,7 @@ defmodule Rodar.Scaffold do
   """
   @spec registration_type(atom()) :: :handler_map | :task_registry
   def registration_type(:bpmn_activity_task_service), do: :handler_map
+  def registration_type(:bpmn_activity_task_business_rule), do: :handler_map
   def registration_type(_), do: :task_registry
 
   @doc """
@@ -233,6 +239,22 @@ defmodule Rodar.Scaffold do
       @impl true
       def execute(_attrs, _data) do
         # TODO: Implement service task logic
+        {:ok, %{}}
+      end
+    end
+    """
+  end
+
+  defp build_module_content(full_module, :bpmn_activity_task_business_rule) do
+    """
+    defmodule #{full_module} do
+      @moduledoc false
+
+      @behaviour Rodar.Activity.Task.BusinessRule.Handler
+
+      @impl true
+      def execute(_attrs, _data) do
+        # TODO: Implement business rule logic
         {:ok, %{}}
       end
     end
