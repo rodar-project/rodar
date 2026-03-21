@@ -6,6 +6,10 @@ defmodule Rodar.Event.Intermediate.Catch do
   waiting for a matching event (message, signal, or timer) before releasing
   the token to outgoing flows.
 
+  Link catch events are passive targets — they are jumped to by a matching
+  link throw event. When reached via normal token flow (not from a throw),
+  they simply release the token to their outgoing flows.
+
   ## Examples
 
       iex> {:ok, context} = Rodar.Context.start_link(%{}, %{})
@@ -40,6 +44,10 @@ defmodule Rodar.Event.Intermediate.Catch do
       has_conditional?(attrs) ->
         handle_conditional(id, attrs, outgoing, context)
 
+      has_link?(attrs) ->
+        # Link catches are passive — just pass through on normal token flow
+        Rodar.release_token(outgoing, context)
+
       true ->
         {:error, "Catch event '#{id}': unsupported event definition"}
     end
@@ -73,6 +81,10 @@ defmodule Rodar.Event.Intermediate.Catch do
 
   defp has_conditional?(attrs) do
     match?({:bpmn_event_definition_conditional, _}, Map.get(attrs, :conditionalEventDefinition))
+  end
+
+  defp has_link?(attrs) do
+    match?({:bpmn_event_definition_link, _}, Map.get(attrs, :linkEventDefinition))
   end
 
   defp subscribe_message(id, attrs, outgoing, context) do

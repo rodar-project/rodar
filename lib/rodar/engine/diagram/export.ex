@@ -57,7 +57,7 @@ defmodule Rodar.Engine.Diagram.Export do
     handler
     messageEventDefinition signalEventDefinition errorEventDefinition
     escalationEventDefinition compensateEventDefinition terminateEventDefinition
-    timerEventDefinition conditionalEventDefinition
+    timerEventDefinition conditionalEventDefinition linkEventDefinition
     timeDuration timeCycle timeDate
     condition condition_language
     lane_set
@@ -310,6 +310,7 @@ defmodule Rodar.Engine.Diagram.Export do
 
   defp build_event_definitions(attrs, depth) do
     [
+      build_event_def(:linkEventDefinition, attrs, depth),
       build_event_def(:messageEventDefinition, attrs, depth),
       build_event_def(:signalEventDefinition, attrs, depth),
       build_event_def(:errorEventDefinition, attrs, depth),
@@ -319,6 +320,23 @@ defmodule Rodar.Engine.Diagram.Export do
       build_event_def(:timerEventDefinition, attrs, depth),
       build_event_def(:conditionalEventDefinition, attrs, depth)
     ]
+  end
+
+  defp build_event_def(:linkEventDefinition, attrs, depth) do
+    case Map.get(attrs, :linkEventDefinition) do
+      nil ->
+        []
+
+      {:bpmn_event_definition_link, def_attrs} ->
+        xml_attrs =
+          def_attrs
+          |> Map.take([:name])
+          |> filter_exportable_attrs()
+          |> sort_attrs()
+          |> build_attrs()
+
+        self_closing_or_empty("bpmn2:linkEventDefinition", xml_attrs, depth)
+    end
   end
 
   defp build_event_def(:messageEventDefinition, attrs, depth) do
