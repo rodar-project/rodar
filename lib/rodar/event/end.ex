@@ -2,12 +2,18 @@ defmodule Rodar.Event.End do
   @moduledoc """
   Handle passing the token through an end event element.
 
-  Supports three types of end events:
+  Supports the following end event types:
 
   - **Plain end** — Normal completion. Returns `{:ok, context}`.
   - **Error end** — Sets error state in context. Returns `{:error, error_ref}`.
   - **Terminate end** — Signals all branches to stop. Returns `{:ok, context}`
     after marking the process as terminated.
+  - **Message end** — Publishes a message to the event bus, then returns `{:ok, context}`.
+  - **Signal end** — Publishes a signal (broadcast) to the event bus, then returns `{:ok, context}`.
+  - **Escalation end** — Publishes an escalation (broadcast) to the event bus, then returns `{:ok, context}`.
+
+  Message, signal, and escalation end events follow the same publishing pattern
+  as `Rodar.Event.Intermediate.Throw`, using `Rodar.Event.Bus` for delivery.
 
   ## Examples
 
@@ -30,6 +36,9 @@ defmodule Rodar.Event.End do
 
   """
 
+  alias Rodar.Context
+  alias Rodar.Event.Bus
+
   @doc """
   Receive the token for the element and handle end event logic.
   """
@@ -45,6 +54,18 @@ defmodule Rodar.Event.End do
 
         has_compensate_definition?(attrs) ->
           handle_compensate(attrs, context)
+
+        has_message?(attrs) ->
+          publish_message(attrs, context)
+          {:ok, context}
+
+        has_signal?(attrs) ->
+          publish_signal(attrs, context)
+          {:ok, context}
+
+        has_escalation?(attrs) ->
+          publish_escalation(attrs, context)
+          {:ok, context}
 
         true ->
           {:ok, context}
@@ -67,14 +88,29 @@ defmodule Rodar.Event.End do
     Map.get(attrs, :terminateEventDefinition) != nil
   end
 
+  defp has_message?(attrs) do
+    match?({:bpmn_event_definition_message, _}, Map.get(attrs, :messageEventDefinition))
+  end
+
+  defp has_signal?(attrs) do
+    match?({:bpmn_event_definition_signal, _}, Map.get(attrs, :signalEventDefinition))
+  end
+
+  defp has_escalation?(attrs) do
+    match?(
+      {:bpmn_event_definition_escalation, _},
+      Map.get(attrs, :escalationEventDefinition)
+    )
+  end
+
   defp handle_error(attrs, context) do
     {:bpmn_event_definition_error, %{errorRef: error_ref}} = attrs.errorEventDefinition
-    Rodar.Context.put_meta(context, :error, error_ref)
+    Context.put_meta(context, :error, error_ref)
     {:error, error_ref}
   end
 
   defp handle_terminate(context) do
-    Rodar.Context.put_meta(context, :terminated, true)
+    Context.put_meta(context, :terminated, true)
     {:ok, context}
   end
 
@@ -93,5 +129,42 @@ defmodule Rodar.Event.End do
     end
 
     {:ok, context}
+  end
+
+  defp publish_message(attrs, context) do
+    id = Map.get(attrs, :id)
+    {:bpmn_event_definition_message, def_attrs} = attrs.messageEventDefinition
+    message_name = Map.get(def_attrs, :messageRef, id)
+    data = Context.get(context, :data)
+    payload = %{source: id, data: data}
+    payload = put_correlation(payload, def_attrs, context)
+    Bus.publish(:message, message_name, payload)
+  end
+
+  defp publish_signal(attrs, context) do
+    id = Map.get(attrs, :id)
+    {:bpmn_event_definition_signal, def_attrs} = attrs.signalEventDefinition
+    signal_name = Map.get(def_attrs, :signalRef, id)
+    data = Context.get(context, :data)
+    Bus.publish(:signal, signal_name, %{source: id, data: data})
+  end
+
+  defp publish_escalation(attrs, context) do
+    id = Map.get(attrs, :id)
+    {:bpmn_event_definition_escalation, def_attrs} = attrs.escalationEventDefinition
+    escalation_code = Map.get(def_attrs, :escalationRef, id)
+    data = Context.get(context, :data)
+    Bus.publish(:escalation, escalation_code, %{source: id, data: data})
+  end
+
+  defp put_correlation(payload, def_attrs, context) do
+    case Map.get(def_attrs, :correlationKey) do
+      nil ->
+        payload
+
+      key ->
+        data = Context.get(context, :data)
+        Map.put(payload, :correlation, %{key: key, value: Map.get(data, key)})
+    end
   end
 end

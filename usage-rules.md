@@ -293,6 +293,38 @@ Rodar.release_token(outgoing_flow_ids, context)
 Rodar.Process.resume(pid)  # Status changes but nothing executes
 ```
 
+## End Event Publishing
+
+End events with message, signal, or escalation definitions publish to the event
+bus before completing. This mirrors the behavior of intermediate throw events.
+The payload includes the element source ID and the current context data.
+
+```elixir
+# GOOD: Subscribe before the end event fires — subscriber receives the event
+Rodar.Event.Bus.subscribe(:message, "order_completed", %{
+  context: context,
+  node_id: "catch_order_done"
+})
+# When the process reaches an end event with a messageEventDefinition
+# referencing "order_completed", the subscriber receives the message
+
+# GOOD: Signal end events broadcast to all subscribers
+Rodar.Event.Bus.subscribe(:signal, "process_finished", %{node_id: "listener_1"})
+Rodar.Event.Bus.subscribe(:signal, "process_finished", %{node_id: "listener_2"})
+# Both subscribers receive the signal when the end event fires
+
+# GOOD: Escalation end events also broadcast
+Rodar.Event.Bus.subscribe(:escalation, "Escalation_001", %{node_id: "boundary_esc"})
+# Subscriber receives escalation when end event with that code fires
+
+# BAD: Expecting end event publishing without an event definition
+# A plain end event (no messageEventDefinition, signalEventDefinition, etc.)
+# does NOT publish anything — it just returns {:ok, context}
+
+# BAD: Subscribing after the end event fires — message is already gone
+# End events publish synchronously, so subscribe before the process runs
+```
+
 ## Event Bus
 
 The event bus supports message, signal, and escalation events with different
