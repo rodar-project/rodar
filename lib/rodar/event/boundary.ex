@@ -54,7 +54,7 @@ defmodule Rodar.Event.Boundary do
 
     cond do
       has_error?(attrs) ->
-        handle_error_boundary(id, outgoing, context)
+        handle_error_boundary(outgoing, context)
 
       has_message?(attrs) ->
         handle_message_boundary(id, attrs, outgoing, context, cancel_activity)
@@ -70,6 +70,9 @@ defmodule Rodar.Event.Boundary do
 
       has_conditional?(attrs) ->
         handle_conditional_boundary(id, attrs, outgoing, context, cancel_activity)
+
+      has_cancel?(attrs) ->
+        handle_cancel_boundary(outgoing, context)
 
       has_compensate?(attrs) ->
         # Compensation boundary events are passive — handler registration
@@ -105,12 +108,16 @@ defmodule Rodar.Event.Boundary do
     match?({:bpmn_event_definition_conditional, _}, Map.get(attrs, :conditionalEventDefinition))
   end
 
+  defp has_cancel?(attrs) do
+    match?({:bpmn_event_definition_cancel, _}, Map.get(attrs, :cancelEventDefinition))
+  end
+
   defp has_compensate?(attrs) do
     match?({:bpmn_event_definition_compensate, _}, Map.get(attrs, :compensateEventDefinition))
   end
 
   # Error boundaries are activated directly by the parent activity
-  defp handle_error_boundary(_id, outgoing, context) do
+  defp handle_error_boundary(outgoing, context) do
     Rodar.release_token(outgoing, context)
   end
 
@@ -246,6 +253,11 @@ defmodule Rodar.Event.Boundary do
         data = Context.get(context, :data)
         Map.put(metadata, :correlation, %{key: key, value: Map.get(data, key)})
     end
+  end
+
+  # Cancel boundaries are activated directly by the transaction subprocess
+  defp handle_cancel_boundary(outgoing, context) do
+    Rodar.release_token(outgoing, context)
   end
 
   defp handle_escalation_boundary(id, attrs, outgoing, context, cancel_activity) do

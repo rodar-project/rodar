@@ -11,6 +11,9 @@ defmodule Rodar.Event.End do
   - **Message end** — Publishes a message to the event bus, then returns `{:ok, context}`.
   - **Signal end** — Publishes a signal (broadcast) to the event bus, then returns `{:ok, context}`.
   - **Escalation end** — Publishes an escalation (broadcast) to the event bus, then returns `{:ok, context}`.
+  - **Cancel end** — Triggers cancellation of the enclosing transaction subprocess.
+    Sets `:cancelled` meta on context and triggers scoped compensation for
+    activities within the transaction scope. Returns `{:ok, context}`.
 
   Message, signal, and escalation end events follow the same publishing pattern
   as `Rodar.Event.Intermediate.Throw`, using `Rodar.Event.Bus` for delivery.
@@ -67,6 +70,9 @@ defmodule Rodar.Event.End do
           publish_escalation(attrs, context)
           {:ok, context}
 
+        has_cancel_definition?(attrs) ->
+          handle_cancel(context)
+
         true ->
           {:ok, context}
       end
@@ -111,6 +117,25 @@ defmodule Rodar.Event.End do
 
   defp handle_terminate(context) do
     Context.put_meta(context, :terminated, true)
+    {:ok, context}
+  end
+
+  defp has_cancel_definition?(attrs) do
+    match?({:bpmn_event_definition_cancel, _}, Map.get(attrs, :cancelEventDefinition))
+  end
+
+  defp handle_cancel(context) do
+    Rodar.Context.put_meta(context, :cancelled, true)
+
+    # Trigger scoped compensation for the transaction scope
+    transaction_scope = Rodar.Context.get_meta(context, :transaction_scope)
+
+    if transaction_scope do
+      Rodar.Compensation.compensate_scope(context, transaction_scope)
+    else
+      Rodar.Compensation.compensate_all(context)
+    end
+
     {:ok, context}
   end
 

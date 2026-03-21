@@ -47,6 +47,7 @@ defmodule Rodar.Engine.Diagram.Export do
     bpmn_activity_subprocess: "bpmn2:callActivity",
     bpmn_activity_subprocess_embeded: "bpmn2:subProcess",
     bpmn_activity_subprocess_event: "bpmn2:subProcess",
+    bpmn_activity_subprocess_transaction: "bpmn2:transaction",
     bpmn_sequence_flow: "bpmn2:sequenceFlow",
     bpmn_data_store_reference: "bpmn2:dataStoreReference",
     bpmn_property: "bpmn2:property"
@@ -59,7 +60,7 @@ defmodule Rodar.Engine.Diagram.Export do
     handler
     messageEventDefinition signalEventDefinition errorEventDefinition
     escalationEventDefinition compensateEventDefinition terminateEventDefinition
-    timerEventDefinition conditionalEventDefinition linkEventDefinition
+    timerEventDefinition conditionalEventDefinition linkEventDefinition cancelEventDefinition
     timeDuration timeCycle timeDate
     condition condition_language
     lane_set
@@ -229,6 +230,10 @@ defmodule Rodar.Engine.Diagram.Export do
     build_event_subprocess(attrs, depth)
   end
 
+  defp build_element({:bpmn_activity_subprocess_transaction, attrs}, depth) do
+    build_transaction(attrs, depth)
+  end
+
   defp build_element({type, attrs}, depth) do
     tag_name = Map.get(@type_to_tag, type)
 
@@ -279,7 +284,8 @@ defmodule Rodar.Engine.Diagram.Export do
         :bpmn_activity_task_send,
         :bpmn_activity_task_receive,
         :bpmn_activity_task_manual,
-        :bpmn_activity_subprocess
+        :bpmn_activity_subprocess,
+        :bpmn_activity_subprocess_transaction
       ] ->
         :task
 
@@ -327,7 +333,8 @@ defmodule Rodar.Engine.Diagram.Export do
       build_event_def(:compensateEventDefinition, attrs, depth),
       build_event_def(:terminateEventDefinition, attrs, depth),
       build_event_def(:timerEventDefinition, attrs, depth),
-      build_event_def(:conditionalEventDefinition, attrs, depth)
+      build_event_def(:conditionalEventDefinition, attrs, depth),
+      build_event_def(:cancelEventDefinition, attrs, depth)
     ]
   end
 
@@ -451,6 +458,16 @@ defmodule Rodar.Engine.Diagram.Export do
       {:bpmn_event_definition_timer, def_attrs} ->
         children = build_timer_children(def_attrs, depth + 1)
         tag("bpmn2:timerEventDefinition", "", children, depth)
+    end
+  end
+
+  defp build_event_def(:cancelEventDefinition, attrs, depth) do
+    case Map.get(attrs, :cancelEventDefinition) do
+      nil ->
+        []
+
+      {:bpmn_event_definition_cancel, _} ->
+        self_closing_tag("bpmn2:cancelEventDefinition", "", depth)
     end
   end
 
@@ -880,6 +897,26 @@ defmodule Rodar.Engine.Diagram.Export do
     ]
 
     tag("bpmn2:subProcess", xml_attrs, children, depth)
+  end
+
+  # --- Transaction Subprocess ---
+
+  defp build_transaction(attrs, depth) do
+    xml_attrs =
+      attrs
+      |> Map.take([:id, :name])
+      |> filter_exportable_attrs()
+      |> sort_attrs()
+      |> build_attrs()
+
+    elements = Map.get(attrs, :elements, %{})
+
+    children = [
+      build_incoming_outgoing(attrs, depth + 1),
+      build_process_elements(elements, depth + 1)
+    ]
+
+    tag("bpmn2:transaction", xml_attrs, children, depth)
   end
 
   # --- Embedded Subprocess ---

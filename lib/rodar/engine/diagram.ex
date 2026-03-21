@@ -177,6 +177,11 @@ defmodule Rodar.Engine.Diagram do
         updated = inject_handlers_into_elements(nested, handler_map)
         {id, {:bpmn_activity_subprocess_event, %{attrs | elements: updated}}}
 
+      {id, {:bpmn_activity_subprocess_transaction, %{elements: nested} = attrs}}
+      when is_map(nested) ->
+        updated = inject_handlers_into_elements(nested, handler_map)
+        {id, {:bpmn_activity_subprocess_transaction, %{attrs | elements: updated}}}
+
       {id, elem} ->
         {id, elem}
     end)
@@ -383,7 +388,8 @@ defmodule Rodar.Engine.Diagram do
          messageEventDefinition: load_first_element("bpmn2:messageEventDefinition", elems),
          signalEventDefinition: load_first_element("bpmn2:signalEventDefinition", elems),
          terminateEventDefinition: load_first_element("bpmn2:terminateEventDefinition", elems),
-         timerEventDefinition: load_first_element("bpmn2:timerEventDefinition", elems)
+         timerEventDefinition: load_first_element("bpmn2:timerEventDefinition", elems),
+         cancelEventDefinition: load_first_element("bpmn2:cancelEventDefinition", elems)
        })}
 
   defp load_element("bpmn2:endEvent", attrs, elems),
@@ -400,7 +406,8 @@ defmodule Rodar.Engine.Diagram do
          messageEventDefinition: load_first_element("bpmn2:messageEventDefinition", elems),
          signalEventDefinition: load_first_element("bpmn2:signalEventDefinition", elems),
          terminateEventDefinition: load_first_element("bpmn2:terminateEventDefinition", elems),
-         timerEventDefinition: load_first_element("bpmn2:timerEventDefinition", elems)
+         timerEventDefinition: load_first_element("bpmn2:timerEventDefinition", elems),
+         cancelEventDefinition: load_first_element("bpmn2:cancelEventDefinition", elems)
        })}
 
   defp load_element("bpmn2:intermediateThrowEvent", attrs, elems),
@@ -418,7 +425,8 @@ defmodule Rodar.Engine.Diagram do
          messageEventDefinition: load_first_element("bpmn2:messageEventDefinition", elems),
          signalEventDefinition: load_first_element("bpmn2:signalEventDefinition", elems),
          terminateEventDefinition: load_first_element("bpmn2:terminateEventDefinition", elems),
-         timerEventDefinition: load_first_element("bpmn2:timerEventDefinition", elems)
+         timerEventDefinition: load_first_element("bpmn2:timerEventDefinition", elems),
+         cancelEventDefinition: load_first_element("bpmn2:cancelEventDefinition", elems)
        })}
 
   defp load_element("bpmn2:intermediateCatchEvent", attrs, elems),
@@ -436,7 +444,8 @@ defmodule Rodar.Engine.Diagram do
          messageEventDefinition: load_first_element("bpmn2:messageEventDefinition", elems),
          signalEventDefinition: load_first_element("bpmn2:signalEventDefinition", elems),
          terminateEventDefinition: load_first_element("bpmn2:terminateEventDefinition", elems),
-         timerEventDefinition: load_first_element("bpmn2:timerEventDefinition", elems)
+         timerEventDefinition: load_first_element("bpmn2:timerEventDefinition", elems),
+         cancelEventDefinition: load_first_element("bpmn2:cancelEventDefinition", elems)
        })}
 
   defp load_element("bpmn2:exclusiveGateway", attrs, elems),
@@ -581,6 +590,9 @@ defmodule Rodar.Engine.Diagram do
   defp load_element("bpmn2:terminateEventDefinition", attrs, elems),
     do: {:bpmn_event_definition_terminate, Map.merge(attrs, %{_elems: elems})}
 
+  defp load_element("bpmn2:cancelEventDefinition", attrs, elems),
+    do: {:bpmn_event_definition_cancel, Map.merge(attrs, %{_elems: elems})}
+
   defp load_element("bpmn2:timerEventDefinition", attrs, elems) do
     timer_attrs =
       Enum.reduce(elems, %{}, fn
@@ -637,6 +649,15 @@ defmodule Rodar.Engine.Diagram do
      })}
   end
 
+  defp load_element("bpmn2:transaction", attrs, elems),
+    do:
+      {:bpmn_activity_subprocess_transaction,
+       Map.merge(attrs, %{
+         incoming: load_elements("bpmn2:incoming", elems),
+         outgoing: load_elements("bpmn2:outgoing", elems),
+         elements: map_process_elements(elems)
+       })}
+
   defp load_element("bpmn2:boundaryEvent", attrs, elems),
     do:
       {:bpmn_event_boundary,
@@ -651,7 +672,8 @@ defmodule Rodar.Engine.Diagram do
          errorEventDefinition: load_first_element("bpmn2:errorEventDefinition", elems),
          messageEventDefinition: load_first_element("bpmn2:messageEventDefinition", elems),
          signalEventDefinition: load_first_element("bpmn2:signalEventDefinition", elems),
-         timerEventDefinition: load_first_element("bpmn2:timerEventDefinition", elems)
+         timerEventDefinition: load_first_element("bpmn2:timerEventDefinition", elems),
+         cancelEventDefinition: load_first_element("bpmn2:cancelEventDefinition", elems)
        })}
 
   defp load_element("bpmn2:callActivity", attrs, elems),

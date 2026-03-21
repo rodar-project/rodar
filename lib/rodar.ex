@@ -44,6 +44,7 @@ defmodule Rodar do
   alias Rodar.Activity.Subprocess
   alias Rodar.Activity.Subprocess.Embedded, as: SubprocessEmbedded
   alias Rodar.Activity.Subprocess.Event, as: SubprocessEvent
+  alias Rodar.Activity.Subprocess.Transaction, as: SubprocessTransaction
   alias Rodar.Activity.Task.BusinessRule
   alias Rodar.Activity.Task.Manual
   alias Rodar.Activity.Task.Receive, as: TaskReceive
@@ -284,6 +285,9 @@ defmodule Rodar do
   defp dispatch({:bpmn_activity_subprocess_event, _} = elem, context),
     do: SubprocessEvent.token_in(elem, context)
 
+  defp dispatch({:bpmn_activity_subprocess_transaction, _} = elem, context),
+    do: SubprocessTransaction.token_in(elem, context)
+
   defp dispatch({:bpmn_gateway_exclusive, _} = elem, context),
     do: Exclusive.token_in(elem, context)
 
@@ -333,7 +337,8 @@ defmodule Rodar do
     :bpmn_activity_task_receive,
     :bpmn_activity_subprocess,
     :bpmn_activity_subprocess_embeded,
-    :bpmn_activity_subprocess_event
+    :bpmn_activity_subprocess_event,
+    :bpmn_activity_subprocess_transaction
   ]
 
   defp classify_result({:ok, _}, _context, _id), do: :ok
