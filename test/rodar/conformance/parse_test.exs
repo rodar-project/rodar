@@ -404,9 +404,16 @@ defmodule Rodar.Conformance.ParseTest do
       assert length(diagram.processes) == 1
     end
 
-    test "contains embedded subprocesses", %{diagram: diagram} do
+    test "contains subprocesses (embedded and event)", %{diagram: diagram} do
       elements = TestHelper.first_process_elements(diagram)
-      assert TestHelper.count_elements_by_type(elements, :bpmn_activity_subprocess_embeded) >= 2
+
+      embedded =
+        TestHelper.count_elements_by_type(elements, :bpmn_activity_subprocess_embeded)
+
+      event =
+        TestHelper.count_elements_by_type(elements, :bpmn_activity_subprocess_event)
+
+      assert embedded + event >= 2
     end
 
     test "contains service tasks", %{diagram: diagram} do
@@ -444,9 +451,16 @@ defmodule Rodar.Conformance.ParseTest do
       assert length(diagram.processes) == 1
     end
 
-    test "contains embedded subprocesses", %{diagram: diagram} do
+    test "contains subprocesses (embedded and event)", %{diagram: diagram} do
       elements = TestHelper.first_process_elements(diagram)
-      assert TestHelper.count_elements_by_type(elements, :bpmn_activity_subprocess_embeded) >= 3
+
+      embedded =
+        TestHelper.count_elements_by_type(elements, :bpmn_activity_subprocess_embeded)
+
+      event =
+        TestHelper.count_elements_by_type(elements, :bpmn_activity_subprocess_event)
+
+      assert embedded + event >= 3
     end
   end
 
@@ -454,25 +468,25 @@ defmodule Rodar.Conformance.ParseTest do
     @tag :skip
     test "A.4.1 — choreography/extended namespace" do
       diagram = TestHelper.load_fixture(:miwg, "A.4.1.bpmn")
-      assert length(diagram.processes) >= 1
+      assert diagram.processes != []
     end
 
     @tag :skip
     test "C.1.0 — extended namespace" do
       diagram = TestHelper.load_fixture(:miwg, "C.1.0.bpmn")
-      assert length(diagram.processes) >= 1
+      assert diagram.processes != []
     end
 
     @tag :skip
     test "C.1.1 — extended namespace" do
       diagram = TestHelper.load_fixture(:miwg, "C.1.1.bpmn")
-      assert length(diagram.processes) >= 1
+      assert diagram.processes != []
     end
 
     @tag :skip
     test "C.3.0 — extended namespace" do
       diagram = TestHelper.load_fixture(:miwg, "C.3.0.bpmn")
-      assert length(diagram.processes) >= 1
+      assert diagram.processes != []
     end
   end
 end

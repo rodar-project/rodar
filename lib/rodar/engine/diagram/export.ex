@@ -46,6 +46,7 @@ defmodule Rodar.Engine.Diagram.Export do
     bpmn_activity_task_manual: "bpmn2:manualTask",
     bpmn_activity_subprocess: "bpmn2:callActivity",
     bpmn_activity_subprocess_embeded: "bpmn2:subProcess",
+    bpmn_activity_subprocess_event: "bpmn2:subProcess",
     bpmn_sequence_flow: "bpmn2:sequenceFlow",
     bpmn_data_store_reference: "bpmn2:dataStoreReference",
     bpmn_property: "bpmn2:property"
@@ -222,6 +223,10 @@ defmodule Rodar.Engine.Diagram.Export do
 
   defp build_element({type, attrs}, depth) when type in [:bpmn_activity_subprocess_embeded] do
     build_subprocess(attrs, depth)
+  end
+
+  defp build_element({:bpmn_activity_subprocess_event, attrs}, depth) do
+    build_event_subprocess(attrs, depth)
   end
 
   defp build_element({type, attrs}, depth) do
@@ -854,6 +859,27 @@ defmodule Rodar.Engine.Diagram.Export do
   defp build_loop_data_item(tag_name, name, depth) do
     xml_attrs = build_attrs([{"name", name}])
     self_closing_tag(tag_name, xml_attrs, depth)
+  end
+
+  # --- Event Subprocess ---
+
+  defp build_event_subprocess(attrs, depth) do
+    xml_attrs =
+      attrs
+      |> Map.take([:id, :name])
+      |> filter_exportable_attrs()
+      |> sort_attrs()
+      |> Kernel.++([{:triggeredByEvent, "true"}])
+      |> build_attrs()
+
+    elements = Map.get(attrs, :elements, %{})
+
+    children = [
+      build_incoming_outgoing(attrs, depth + 1),
+      build_process_elements(elements, depth + 1)
+    ]
+
+    tag("bpmn2:subProcess", xml_attrs, children, depth)
   end
 
   # --- Embedded Subprocess ---

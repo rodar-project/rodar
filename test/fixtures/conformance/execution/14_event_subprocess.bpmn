@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_14" name="Event Subprocess" isExecutable="true">
+    <bpmn:startEvent id="Start_1" name="Start">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:userTask id="Task_Main" name="Main Task">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+    </bpmn:userTask>
+    <bpmn:endEvent id="End_1" name="End">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_1" targetRef="Task_Main"/>
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_Main" targetRef="End_1"/>
+    <bpmn:subProcess id="EventSub_1" name="Error Handler" triggeredByEvent="true">
+      <bpmn:startEvent id="EventSub_Start" name="On Message" isInterrupting="true">
+        <bpmn:outgoing>ESF_1</bpmn:outgoing>
+        <bpmn:messageEventDefinition messageRef="cancel_order"/>
+      </bpmn:startEvent>
+      <bpmn:task id="EventSub_Task" name="Handle Cancel">
+        <bpmn:incoming>ESF_1</bpmn:incoming>
+        <bpmn:outgoing>ESF_2</bpmn:outgoing>
+      </bpmn:task>
+      <bpmn:endEvent id="EventSub_End" name="Event Sub End">
+        <bpmn:incoming>ESF_2</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="ESF_1" sourceRef="EventSub_Start" targetRef="EventSub_Task"/>
+      <bpmn:sequenceFlow id="ESF_2" sourceRef="EventSub_Task" targetRef="EventSub_End"/>
+    </bpmn:subProcess>
+  </bpmn:process>
+</bpmn:definitions>
