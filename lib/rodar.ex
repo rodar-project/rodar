@@ -42,6 +42,7 @@ defmodule Rodar do
 
   alias Rodar.Activity.Subprocess
   alias Rodar.Activity.Subprocess.Embedded, as: SubprocessEmbedded
+  alias Rodar.Activity.Task.BusinessRule
   alias Rodar.Activity.Task.Manual
   alias Rodar.Activity.Task.Receive, as: TaskReceive
   alias Rodar.Activity.Task.Script
@@ -251,6 +252,9 @@ defmodule Rodar do
   defp dispatch({:bpmn_activity_task_service, _} = elem, context),
     do: Service.token_in(elem, context)
 
+  defp dispatch({:bpmn_activity_task_business_rule, _} = elem, context),
+    do: BusinessRule.token_in(elem, context)
+
   defp dispatch({:bpmn_activity_task_manual, _} = elem, context),
     do: Manual.token_in(elem, context)
 
@@ -309,6 +313,7 @@ defmodule Rodar do
     :bpmn_activity_task_user,
     :bpmn_activity_task_script,
     :bpmn_activity_task_service,
+    :bpmn_activity_task_business_rule,
     :bpmn_activity_task_manual,
     :bpmn_activity_task_send,
     :bpmn_activity_task_receive,

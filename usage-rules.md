@@ -236,10 +236,58 @@ def execute(_attrs, data) do
 end
 ```
 
+## Business Rule Task Handlers
+
+Business rule tasks use the `Rodar.Activity.Task.BusinessRule.Handler` behaviour,
+which is identical to the service task handler. Handler resolution follows the
+same priority: inline `:handler` attribute, then `TaskRegistry` lookup, then
+`{:not_implemented}`. This keeps the door open for future DMN integration.
+
+```elixir
+# GOOD: Implement the BusinessRule.Handler behaviour
+defmodule MyApp.EvaluateDiscount do
+  @behaviour Rodar.Activity.Task.BusinessRule.Handler
+
+  @impl true
+  def execute(_attrs, data) do
+    discount =
+      cond do
+        data[:total] > 1000 -> 0.15
+        data[:total] > 500 -> 0.10
+        true -> 0.0
+      end
+
+    {:ok, %{discount: discount}}
+  end
+end
+
+# GOOD: Wire via handler_map (same as service tasks)
+diagram = Rodar.Engine.Diagram.load(xml,
+  handler_map: %{"Task_evaluate_discount" => MyApp.EvaluateDiscount}
+)
+
+# GOOD: Wire via TaskRegistry at runtime
+Rodar.TaskRegistry.register("Task_evaluate_discount", MyApp.EvaluateDiscount)
+
+# BAD: Using Service.Handler behaviour for business rule tasks
+defmodule MyApp.BadRule do
+  # Wrong behaviour — use BusinessRule.Handler for business rule tasks
+  @behaviour Rodar.Activity.Task.Service.Handler
+  # ...
+end
+
+# BAD: Using TaskHandler behaviour for business rule tasks
+defmodule MyApp.BadRule do
+  # Wrong — TaskHandler is for custom element types, not business rule tasks
+  @behaviour Rodar.TaskHandler
+  # ...
+end
+```
+
 ## Custom Task Handlers
 
-For custom element types (not service tasks), use the `Rodar.TaskHandler`
-behaviour. These handle the raw token flow.
+For custom element types (not service or business rule tasks), use the
+`Rodar.TaskHandler` behaviour. These handle the raw token flow.
 
 ```elixir
 # GOOD: Custom task handler for a non-standard element type

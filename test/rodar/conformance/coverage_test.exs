@@ -15,6 +15,7 @@ defmodule Rodar.Conformance.CoverageTest do
     :bpmn_activity_task_user,
     :bpmn_activity_task_script,
     :bpmn_activity_task_service,
+    :bpmn_activity_task_business_rule,
     :bpmn_activity_task_send,
     :bpmn_activity_task_receive,
     :bpmn_activity_task_manual,
