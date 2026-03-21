@@ -407,6 +407,7 @@ defmodule Rodar.Engine.Diagram do
          compensateEventDefinition: load_first_element("bpmn2:compensateEventDefinition", elems),
          escalationEventDefinition: load_first_element("bpmn2:escalationEventDefinition", elems),
          errorEventDefinition: load_first_element("bpmn2:errorEventDefinition", elems),
+         linkEventDefinition: load_first_element("bpmn2:linkEventDefinition", elems),
          messageEventDefinition: load_first_element("bpmn2:messageEventDefinition", elems),
          signalEventDefinition: load_first_element("bpmn2:signalEventDefinition", elems),
          terminateEventDefinition: load_first_element("bpmn2:terminateEventDefinition", elems),
@@ -424,6 +425,7 @@ defmodule Rodar.Engine.Diagram do
          compensateEventDefinition: load_first_element("bpmn2:compensateEventDefinition", elems),
          escalationEventDefinition: load_first_element("bpmn2:escalationEventDefinition", elems),
          errorEventDefinition: load_first_element("bpmn2:errorEventDefinition", elems),
+         linkEventDefinition: load_first_element("bpmn2:linkEventDefinition", elems),
          messageEventDefinition: load_first_element("bpmn2:messageEventDefinition", elems),
          signalEventDefinition: load_first_element("bpmn2:signalEventDefinition", elems),
          terminateEventDefinition: load_first_element("bpmn2:terminateEventDefinition", elems),
@@ -553,6 +555,9 @@ defmodule Rodar.Engine.Diagram do
 
   defp load_element("bpmn2:signalEventDefinition", attrs, elems),
     do: {:bpmn_event_definition_signal, Map.merge(attrs, %{_elems: elems})}
+
+  defp load_element("bpmn2:linkEventDefinition", attrs, _elems),
+    do: {:bpmn_event_definition_link, %{name: (attrs[:name] || "") |> to_string()}}
 
   defp load_element("bpmn2:terminateEventDefinition", attrs, elems),
     do: {:bpmn_event_definition_terminate, Map.merge(attrs, %{_elems: elems})}

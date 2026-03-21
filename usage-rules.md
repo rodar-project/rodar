@@ -707,3 +707,42 @@ Rodar.Lane.find_lane_for_node(nil, "task1")  # => :error
 Rodar.Lane.node_lane_map(nil)                 # => %{}
 Rodar.Lane.all_lanes(nil)                      # => []
 ```
+
+## Link Events (Intra-Process GOTO)
+
+Link events act as intra-process GOTOs. A link throw event jumps execution to
+the matching link catch event (paired by name). The throw scans the process map
+for a catch with the same link name and releases the token to the catch's
+outgoing flows. No event bus or registry is involved.
+
+Link catch events are passive targets — when reached via normal token flow
+(not from a throw), they simply pass through to their outgoing flows.
+
+```elixir
+# GOOD: Link throw and catch paired by name in BPMN XML
+# <bpmn:intermediateThrowEvent id="throw1">
+#   <bpmn:linkEventDefinition name="GoToSection2" />
+# </bpmn:intermediateThrowEvent>
+# <bpmn:intermediateCatchEvent id="catch1">
+#   <bpmn:linkEventDefinition name="GoToSection2" />
+# </bpmn:intermediateCatchEvent>
+
+# Parsed elements will have:
+# {:bpmn_event_intermediate_throw, %{linkEventDefinition: {:bpmn_event_definition_link, %{name: "GoToSection2"}}, ...}}
+# {:bpmn_event_intermediate_catch, %{linkEventDefinition: {:bpmn_event_definition_link, %{name: "GoToSection2"}}, ...}}
+
+# The throw handler finds the catch by name and releases token to catch's outgoing flows
+
+# BAD: Using different link names for throw and catch
+# The throw will return {:error, "no matching link catch event with name '...'"}
+# <bpmn:intermediateThrowEvent id="throw1">
+#   <bpmn:linkEventDefinition name="SectionA" />
+# </bpmn:intermediateThrowEvent>
+# <bpmn:intermediateCatchEvent id="catch1">
+#   <bpmn:linkEventDefinition name="SectionB" />    <!-- names don't match! -->
+# </bpmn:intermediateCatchEvent>
+
+# BAD: Using link events across processes
+# Link events are intra-process only. For cross-process communication,
+# use message events with the event bus instead.
+```

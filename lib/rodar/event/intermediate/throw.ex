@@ -4,7 +4,12 @@ defmodule Rodar.Event.Intermediate.Throw do
 
   Intermediate throw events emit events (messages, signals, escalations) to the
   event bus and then release the token to outgoing flows. Events without a
-  specific definition (none/link) pass through immediately.
+  specific definition (none) pass through immediately.
+
+  Link throw events act as intra-process GOTOs. When a link throw event fires,
+  it scans the process map for a matching link catch event (by link name) and
+  releases the token to the catch event's outgoing flows, effectively jumping
+  to the catch location.
 
   ## Examples
 
@@ -41,11 +46,14 @@ defmodule Rodar.Event.Intermediate.Throw do
         publish_escalation(id, attrs, context)
         Rodar.release_token(outgoing, context)
 
+      has_link?(attrs) ->
+        handle_link(id, attrs, context)
+
       has_compensate?(attrs) ->
         handle_compensate(attrs, outgoing, context)
 
       true ->
-        # None/link — pass through
+        # None — pass through
         Rodar.release_token(outgoing, context)
     end
   end
@@ -78,8 +86,38 @@ defmodule Rodar.Event.Intermediate.Throw do
     Bus.publish(:signal, signal_name, %{source: id, data: data})
   end
 
+  defp has_link?(attrs) do
+    match?({:bpmn_event_definition_link, _}, Map.get(attrs, :linkEventDefinition))
+  end
+
   defp has_compensate?(attrs) do
     match?({:bpmn_event_definition_compensate, _}, Map.get(attrs, :compensateEventDefinition))
+  end
+
+  defp handle_link(id, attrs, context) do
+    {:bpmn_event_definition_link, def_attrs} = attrs.linkEventDefinition
+    link_name = Map.get(def_attrs, :name, "")
+    process = Context.get(context, :process)
+
+    case find_link_catch(process, link_name) do
+      {:ok, catch_outgoing} ->
+        Rodar.release_token(catch_outgoing, context)
+
+      :error ->
+        {:error, "Link throw '#{id}': no matching link catch event with name '#{link_name}'"}
+    end
+  end
+
+  defp find_link_catch(process, link_name) when is_map(process) do
+    Enum.find_value(process, :error, fn
+      {_id,
+       {:bpmn_event_intermediate_catch,
+        %{linkEventDefinition: {:bpmn_event_definition_link, %{name: ^link_name}}} = catch_attrs}} ->
+        {:ok, Map.get(catch_attrs, :outgoing, [])}
+
+      _ ->
+        nil
+    end)
   end
 
   defp handle_compensate(attrs, outgoing, context) do
