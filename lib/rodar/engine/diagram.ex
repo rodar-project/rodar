@@ -170,6 +170,11 @@ defmodule Rodar.Engine.Diagram do
         updated = inject_handlers_into_elements(nested, handler_map)
         {id, {:bpmn_activity_subprocess_embeded, %{attrs | elements: updated}}}
 
+      {id, {:bpmn_activity_subprocess_event, %{elements: nested} = attrs}}
+      when is_map(nested) ->
+        updated = inject_handlers_into_elements(nested, handler_map)
+        {id, {:bpmn_activity_subprocess_event, %{attrs | elements: updated}}}
+
       {id, elem} ->
         {id, elem}
     end)
@@ -593,14 +598,21 @@ defmodule Rodar.Engine.Diagram do
          outgoing: load_elements("bpmn2:outgoing", elems)
        })}
 
-  defp load_element("bpmn2:subProcess", attrs, elems),
-    do:
-      {:bpmn_activity_subprocess_embeded,
-       Map.merge(attrs, %{
-         incoming: load_elements("bpmn2:incoming", elems),
-         outgoing: load_elements("bpmn2:outgoing", elems),
-         elements: map_process_elements(elems)
-       })}
+  defp load_element("bpmn2:subProcess", attrs, elems) do
+    type =
+      if to_string(Map.get(attrs, :triggeredByEvent, "false")) == "true" do
+        :bpmn_activity_subprocess_event
+      else
+        :bpmn_activity_subprocess_embeded
+      end
+
+    {type,
+     Map.merge(attrs, %{
+       incoming: load_elements("bpmn2:incoming", elems),
+       outgoing: load_elements("bpmn2:outgoing", elems),
+       elements: map_process_elements(elems)
+     })}
+  end
 
   defp load_element("bpmn2:boundaryEvent", attrs, elems),
     do:

@@ -40,6 +40,8 @@ defmodule Rodar.Context do
 
   use GenServer
 
+  alias Rodar.Activity.Subprocess.Event, as: SubprocessEvent
+  alias Rodar.Event.Bus
   alias Rodar.Event.Timer
   alias Rodar.Expression.Feel
   alias Rodar.Expression.Sandbox
@@ -234,6 +236,17 @@ defmodule Rodar.Context do
   end
 
   @doc """
+  Subscribe to the event bus from within the context GenServer process.
+
+  This ensures the context is the registered subscriber PID, so that
+  `{:bpmn_event, ...}` messages are delivered to the context's `handle_info`.
+  """
+  @spec subscribe_event(pid(), atom(), String.t(), map()) :: {:ok, {atom(), String.t()}}
+  def subscribe_event(context, event_type, event_name, metadata) do
+    GenServer.call(context, {:subscribe_event, event_type, event_name, metadata})
+  end
+
+  @doc """
   Subscribe to condition evaluation on data changes.
   When any `put_data` call makes the condition expression evaluate to true,
   the context sends a `{:condition_met, ...}` message to itself.
@@ -366,6 +379,11 @@ defmodule Rodar.Context do
     {:reply, filtered, state}
   end
 
+  def handle_call({:subscribe_event, event_type, event_name, metadata}, _from, state) do
+    result = Bus.subscribe(event_type, event_name, metadata)
+    {:reply, result, state}
+  end
+
   def handle_call({:subscribe_condition, sub_id, condition_expr, metadata}, _from, state) do
     subs =
       Map.put(state.conditional_subscriptions, sub_id, %{
@@ -382,6 +400,34 @@ defmodule Rodar.Context do
   end
 
   @impl true
+  def handle_info({:condition_met, "event_subprocess:" <> _ = sub_id, _outgoing}, state) do
+    # Look up the conditional subscription metadata for this event subprocess
+    sub = Map.get(state.conditional_subscriptions, sub_id)
+
+    new_state =
+      if sub do
+        %{metadata: meta} = sub
+        subprocess_attrs = Map.get(meta, :subprocess_attrs)
+        interrupting = Map.get(meta, :interrupting, true)
+        context = self()
+
+        spawn(fn ->
+          SubprocessEvent.activate(subprocess_attrs, context, %{})
+        end)
+
+        if interrupting do
+          subs = Map.delete(state.conditional_subscriptions, sub_id)
+          %{state | conditional_subscriptions: subs}
+        else
+          state
+        end
+      else
+        state
+      end
+
+    {:noreply, new_state}
+  end
+
   def handle_info({:condition_met, node_id, outgoing}, state) do
     nodes = Map.put(state.nodes, node_id, %{active: false, completed: true, type: :catch_event})
     subs = Map.delete(state.conditional_subscriptions, node_id)
@@ -427,12 +473,76 @@ defmodule Rodar.Context do
     {:noreply, new_state}
   end
 
+  def handle_info(
+        {:bpmn_event, _type, _name, payload, %{type: :event_subprocess} = metadata},
+        state
+      ) do
+    %{subprocess_attrs: subprocess_attrs, context: context} = metadata
+
+    spawn(fn ->
+      SubprocessEvent.activate(subprocess_attrs, context, payload)
+    end)
+
+    # Re-subscribe for non-interrupting (can fire multiple times)
+    # This runs inside the context GenServer, so Bus.subscribe registers
+    # the context PID as the subscriber automatically.
+    if not Map.get(metadata, :interrupting, true) do
+      event_type = Map.get(metadata, :event_type)
+      event_name = Map.get(metadata, :event_name)
+
+      if event_type && event_name do
+        Bus.subscribe(event_type, event_name, metadata)
+      end
+    end
+
+    {:noreply, state}
+  end
+
   def handle_info({:bpmn_event, _type, _name, _payload, metadata}, state) do
     %{node_id: node_id, outgoing: outgoing, context: context} = metadata
     nodes = Map.put(state.nodes, node_id, %{active: false, completed: true, type: :catch_event})
     new_state = %{state | nodes: nodes}
     spawn(fn -> Rodar.release_token(outgoing, context) end)
     {:noreply, new_state}
+  end
+
+  def handle_info(
+        {:event_subprocess_timer, _subprocess_id, subprocess_attrs, _interrupting},
+        state
+      ) do
+    context = self()
+
+    spawn(fn ->
+      SubprocessEvent.activate(subprocess_attrs, context, %{})
+    end)
+
+    {:noreply, state}
+  end
+
+  def handle_info(
+        {:event_subprocess_timer_cycle, subprocess_id, subprocess_attrs, interrupting, remaining,
+         duration_ms},
+        state
+      ) do
+    context = self()
+
+    spawn(fn ->
+      SubprocessEvent.activate(subprocess_attrs, context, %{})
+    end)
+
+    if remaining > 1 || remaining == :infinity do
+      new_remaining =
+        if remaining == :infinity, do: :infinity, else: remaining - 1
+
+      Process.send_after(
+        context,
+        {:event_subprocess_timer_cycle, subprocess_id, subprocess_attrs, interrupting,
+         new_remaining, duration_ms},
+        duration_ms
+      )
+    end
+
+    {:noreply, state}
   end
 
   defp evaluate_conditions(state) do

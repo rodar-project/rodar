@@ -495,6 +495,50 @@ diagram = Rodar.Engine.Diagram.load(xml,
 # MyApp.Workflow.OrderProcessing.Handlers.Sub1.CheckStock  (wrong — no subprocess nesting in module path)
 ```
 
+## Event Subprocesses
+
+Event subprocesses are subprocesses with `triggeredByEvent="true"` in BPMN XML.
+They have no incoming/outgoing sequence flows from the parent process -- they
+activate only when their start event fires (message, signal, timer, error,
+escalation, or conditional). The parser emits `:bpmn_activity_subprocess_event`
+for these elements.
+
+Interrupting event subprocesses (default, `isInterrupting="true"` on start event)
+cancel the parent scope. Non-interrupting ones (`isInterrupting="false"`) run in
+parallel and can fire multiple times.
+
+Event subprocess start events are automatically registered when the parent
+process start event executes.
+
+```elixir
+# GOOD: Event subprocesses are parsed and registered automatically
+xml = File.read!("process_with_event_sub.bpmn")
+diagram = Rodar.Engine.Diagram.load(xml)
+[process | _] = diagram.processes
+Rodar.Registry.register("my_process", process)
+{:ok, pid} = Rodar.Process.create_and_run("my_process", %{})
+# Event subprocess triggers are now active — publishing a matching
+# message/signal will activate the event subprocess
+
+# GOOD: Check that a subprocess was parsed as an event subprocess
+{:bpmn_process, _attrs, elements} = process
+{:bpmn_activity_subprocess_event, attrs} = elements["EventSub_1"]
+# attrs.elements contains the nested subprocess elements
+
+# GOOD: Event subprocesses export correctly with triggeredByEvent
+exported = Rodar.Engine.Diagram.Export.to_xml(diagram)
+# Contains: <bpmn2:subProcess id="EventSub_1" triggeredByEvent="true">
+
+# BAD: Expecting event subprocesses to have incoming/outgoing flows
+# Event subprocesses are NOT part of the normal sequence flow
+# They activate ONLY via their start event trigger
+
+# BAD: Manually calling token_in on an event subprocess
+# token_in is a no-op — event subprocesses activate via event triggers
+Rodar.execute({:bpmn_activity_subprocess_event, attrs}, context)
+# Returns {:ok, context} without executing the subprocess
+```
+
 ## Workflow DSL
 
 The Workflow modules provide two layers of abstraction over the low-level engine
