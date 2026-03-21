@@ -981,6 +981,66 @@ Rodar.Compensation.compensate_all(context)
 # Cancel boundary events only make sense attached to a transaction
 ```
 
+## Data I/O Mapping
+
+Tasks can use `ioSpecification` with `dataInputAssociation` and `dataOutputAssociation`
+to control which data flows into and out of a task. This is opt-in — tasks without
+`ioSpecification` receive the full context data map (backward compatible).
+
+```elixir
+# GOOD: Service handler receives only mapped inputs when ioSpecification is present
+# In BPMN XML, the service task has:
+#   <ioSpecification>
+#     <dataInput id="din_1" name="order_id"/>
+#     <dataOutput id="dout_1" name="result"/>
+#   </ioSpecification>
+#   <dataInputAssociation>
+#     <sourceRef>order_id</sourceRef>      <!-- context data key -->
+#     <targetRef>din_1</targetRef>          <!-- task input slot -->
+#   </dataInputAssociation>
+#   <dataOutputAssociation>
+#     <sourceRef>handler_result</sourceRef> <!-- handler result key -->
+#     <targetRef>order_status</targetRef>   <!-- context data key to write -->
+#   </dataOutputAssociation>
+
+# The handler only sees %{"din_1" => 42}, NOT the full context data
+defmodule MyApp.ProcessOrder do
+  @behaviour Rodar.Activity.Task.Service.Handler
+
+  @impl true
+  def execute(_attrs, data) do
+    order_id = data["din_1"]
+    {:ok, %{"handler_result" => process(order_id)}}
+  end
+end
+
+# GOOD: Use DataMapper directly for custom logic
+alias Rodar.Activity.DataMapper
+data = DataMapper.map_inputs(element_attrs, context)
+DataMapper.map_outputs(element_attrs, result_map, context)
+
+# GOOD: Check if an element has I/O mapping
+if DataMapper.has_io_spec?(attrs) do
+  # scoped data
+else
+  # full context data
+end
+
+# BAD: Assuming handler always gets full context data
+# When ioSpecification is present, only mapped keys are passed
+def execute(_attrs, data) do
+  # data["secret_key"] may be nil if not in dataInputAssociation!
+  {:ok, %{}}
+end
+
+# BAD: Writing output keys that don't match dataOutputAssociation sourceRef
+# If the association maps "result" -> "order_result",
+# but handler returns %{"wrong_key" => value}, it won't be written to context
+def execute(_attrs, _data) do
+  {:ok, %{"wrong_key" => "value"}}  # Not mapped — lost!
+end
+```
+
 ## Lanes (Role/Group Assignment)
 
 Lanes are structural metadata that assign flow nodes to roles, groups, or

@@ -74,7 +74,9 @@ defmodule Rodar.Activity.Task.Script do
         context
       )
       when not is_nil(script) do
-    data = Context.get(context, :data)
+    alias Rodar.Activity.DataMapper
+
+    data = DataMapper.map_inputs(attrs, context)
     lang = script_language(attrs)
     output_var = Map.get(attrs, :output_variable, :script_result)
 

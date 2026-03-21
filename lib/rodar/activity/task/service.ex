@@ -103,13 +103,13 @@ defmodule Rodar.Activity.Task.Service do
   end
 
   defp invoke_handler(handler, %{id: id, outgoing: outgoing} = attrs, context) do
-    data = Rodar.Context.get(context, :data)
+    alias Rodar.Activity.DataMapper
+
+    data = DataMapper.map_inputs(attrs, context)
 
     case handler.execute(attrs, data) do
       {:ok, result} when is_map(result) ->
-        Enum.each(result, fn {key, value} ->
-          Rodar.Context.put_data(context, key, value)
-        end)
+        DataMapper.map_outputs(attrs, result, context)
 
         Rodar.release_token(outgoing, context)
 
