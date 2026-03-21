@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="Definitions_MI" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_MI_Parallel" name="Multi-Instance Parallel" isExecutable="true">
+    <bpmn:startEvent id="Start_1" name="Start">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="MI_Task" name="Multi-Instance Task">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics isSequential="false">
+        <bpmn:loopCardinality>3</bpmn:loopCardinality>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_1" name="End">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_1" targetRef="MI_Task"/>
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="MI_Task" targetRef="End_1"/>
+  </bpmn:process>
+  <bpmn:process id="Process_MI_Sequential" name="Multi-Instance Sequential" isExecutable="true">
+    <bpmn:startEvent id="Start_2" name="Start">
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="MI_Task_Seq" name="Sequential MI Task">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics isSequential="true">
+        <bpmn:loopCardinality>3</bpmn:loopCardinality>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_2" name="End">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Start_2" targetRef="MI_Task_Seq"/>
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="MI_Task_Seq" targetRef="End_2"/>
+  </bpmn:process>
+  <bpmn:process id="Process_MI_Collection" name="Multi-Instance Collection" isExecutable="true">
+    <bpmn:startEvent id="Start_3" name="Start">
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="MI_Task_Coll" name="Collection MI Task">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics isSequential="true" loopDataInputRef="items">
+        <bpmn:inputDataItem name="item"/>
+        <bpmn:outputDataItem name="results"/>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_3" name="End">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_5" sourceRef="Start_3" targetRef="MI_Task_Coll"/>
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="MI_Task_Coll" targetRef="End_3"/>
+  </bpmn:process>
+  <bpmn:process id="Process_MI_Completion" name="Multi-Instance Completion Condition" isExecutable="true">
+    <bpmn:startEvent id="Start_4" name="Start">
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="MI_Task_CC" name="Completion Condition MI Task">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics isSequential="true">
+        <bpmn:loopCardinality>10</bpmn:loopCardinality>
+        <bpmn:completionCondition>loopCounter >= 3</bpmn:completionCondition>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="End_4" name="End">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_7" sourceRef="Start_4" targetRef="MI_Task_CC"/>
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="MI_Task_CC" targetRef="End_4"/>
+  </bpmn:process>
+</bpmn:definitions>

@@ -60,7 +60,8 @@ defmodule Rodar.Validation do
         &validate_orphan_nodes/1,
         &validate_gateway_outgoing/1,
         &validate_exclusive_gateway_default/1,
-        &validate_boundary_attachment/1
+        &validate_boundary_attachment/1,
+        &validate_multi_instance/1
       ]
       |> Enum.flat_map(& &1.(process_map))
 
@@ -586,6 +587,53 @@ defmodule Rodar.Validation do
 
       own_refs ++ child_refs
     end)
+  end
+
+  @multi_instance_activity_types [
+    :bpmn_activity_task,
+    :bpmn_activity_task_user,
+    :bpmn_activity_task_script,
+    :bpmn_activity_task_service,
+    :bpmn_activity_task_manual,
+    :bpmn_activity_task_send,
+    :bpmn_activity_task_receive,
+    :bpmn_activity_subprocess,
+    :bpmn_activity_subprocess_embeded
+  ]
+
+  defp validate_multi_instance(process_map) do
+    process_map
+    |> Enum.flat_map(fn
+      {id, {type, attrs}} when type in @multi_instance_activity_types ->
+        case Map.get(attrs, :loop_characteristics) do
+          %{type: :multi_instance} = loop ->
+            validate_multi_instance_loop(id, loop)
+
+          _ ->
+            []
+        end
+
+      _ ->
+        []
+    end)
+  end
+
+  defp validate_multi_instance_loop(id, loop) do
+    has_cardinality = loop[:loopCardinality] != nil
+    has_data_input = loop[:loopDataInputRef] != nil
+
+    if has_cardinality or has_data_input do
+      []
+    else
+      [
+        %{
+          rule: :multi_instance_cardinality,
+          node_id: id,
+          message: "Multi-instance activity '#{id}' requires loopCardinality or loopDataInputRef",
+          severity: :error
+        }
+      ]
+    end
   end
 
   defp empty_list?([]), do: true

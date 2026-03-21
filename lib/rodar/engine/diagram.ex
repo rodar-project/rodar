@@ -475,7 +475,8 @@ defmodule Rodar.Engine.Diagram do
       {:bpmn_activity_task_service,
        Map.merge(attrs, %{
          incoming: load_elements("bpmn2:incoming", elems),
-         outgoing: load_elements("bpmn2:outgoing", elems)
+         outgoing: load_elements("bpmn2:outgoing", elems),
+         loop_characteristics: load_loop_characteristics(elems)
        })}
 
   defp load_element("bpmn2:userTask", attrs, elems),
@@ -486,7 +487,8 @@ defmodule Rodar.Engine.Diagram do
          outgoing: load_elements("bpmn2:outgoing", elems),
          ioSpecification: load_elements("bpmn2:ioSpecification", elems),
          dataInputAssociation: load_elements("bpmn2:dataInputAssociation", elems),
-         dataOutputAssociation: load_elements("bpmn2:dataOutputAssociation", elems)
+         dataOutputAssociation: load_elements("bpmn2:dataOutputAssociation", elems),
+         loop_characteristics: load_loop_characteristics(elems)
        })}
 
   defp load_element("bpmn2:scriptTask", attrs, elems),
@@ -498,7 +500,8 @@ defmodule Rodar.Engine.Diagram do
          ioSpecification: load_elements("bpmn2:ioSpecification", elems),
          dataInputAssociation: load_elements("bpmn2:dataInputAssociation", elems),
          dataOutputAssociation: load_elements("bpmn2:dataOutputAssociation", elems),
-         script: load_first_element("bpmn2:script", elems)
+         script: load_first_element("bpmn2:script", elems),
+         loop_characteristics: load_loop_characteristics(elems)
        })}
 
   defp load_element("bpmn2:dataStoreReference", attrs, elems),
@@ -510,6 +513,7 @@ defmodule Rodar.Engine.Diagram do
        Map.merge(attrs, %{
          incoming: load_elements("bpmn2:incoming", elems),
          outgoing: load_elements("bpmn2:outgoing", elems),
+         loop_characteristics: load_loop_characteristics(elems),
          _elems: elems
        })}
 
@@ -574,7 +578,8 @@ defmodule Rodar.Engine.Diagram do
       {:bpmn_activity_task_send,
        Map.merge(attrs, %{
          incoming: load_elements("bpmn2:incoming", elems),
-         outgoing: load_elements("bpmn2:outgoing", elems)
+         outgoing: load_elements("bpmn2:outgoing", elems),
+         loop_characteristics: load_loop_characteristics(elems)
        })}
 
   defp load_element("bpmn2:receiveTask", attrs, elems),
@@ -582,7 +587,8 @@ defmodule Rodar.Engine.Diagram do
       {:bpmn_activity_task_receive,
        Map.merge(attrs, %{
          incoming: load_elements("bpmn2:incoming", elems),
-         outgoing: load_elements("bpmn2:outgoing", elems)
+         outgoing: load_elements("bpmn2:outgoing", elems),
+         loop_characteristics: load_loop_characteristics(elems)
        })}
 
   defp load_element("bpmn2:manualTask", attrs, elems),
@@ -590,7 +596,8 @@ defmodule Rodar.Engine.Diagram do
       {:bpmn_activity_task_manual,
        Map.merge(attrs, %{
          incoming: load_elements("bpmn2:incoming", elems),
-         outgoing: load_elements("bpmn2:outgoing", elems)
+         outgoing: load_elements("bpmn2:outgoing", elems),
+         loop_characteristics: load_loop_characteristics(elems)
        })}
 
   defp load_element("bpmn2:subProcess", attrs, elems),
@@ -599,7 +606,8 @@ defmodule Rodar.Engine.Diagram do
        Map.merge(attrs, %{
          incoming: load_elements("bpmn2:incoming", elems),
          outgoing: load_elements("bpmn2:outgoing", elems),
-         elements: map_process_elements(elems)
+         elements: map_process_elements(elems),
+         loop_characteristics: load_loop_characteristics(elems)
        })}
 
   defp load_element("bpmn2:boundaryEvent", attrs, elems),
@@ -631,6 +639,73 @@ defmodule Rodar.Engine.Diagram do
     do: {:bpmn_extension_elements, Map.merge(attrs, %{_elems: elems})}
 
   defp load_element(_type, _attrs, _elems), do: nil
+
+  # --- Loop characteristics parsing ---
+
+  defp load_loop_characteristics(elems) do
+    multi = load_multi_instance_loop(elems)
+    standard = load_standard_loop(elems)
+    multi || standard
+  end
+
+  defp load_multi_instance_loop(elems) do
+    Enum.find_value(elems, fn
+      {"bpmn2:multiInstanceLoopCharacteristics", attrs, children} ->
+        attrs = format_attributes(attrs)
+        build_multi_instance_map(attrs, children)
+
+      _ ->
+        nil
+    end)
+  end
+
+  defp build_multi_instance_map(attrs, children) do
+    %{
+      type: :multi_instance,
+      isSequential: (attrs[:isSequential] || "false") |> to_string(),
+      loopCardinality: find_mi_text_child(children, "bpmn2:loopCardinality"),
+      completionCondition: find_mi_text_child(children, "bpmn2:completionCondition"),
+      inputDataItem: find_mi_data_item(children, "bpmn2:inputDataItem"),
+      outputDataItem: find_mi_data_item(children, "bpmn2:outputDataItem"),
+      loopDataInputRef: (attrs[:loopDataInputRef] || nil) && to_string(attrs[:loopDataInputRef]),
+      loopDataOutputRef:
+        (attrs[:loopDataOutputRef] || nil) && to_string(attrs[:loopDataOutputRef])
+    }
+  end
+
+  defp find_mi_text_child(children, tag) do
+    Enum.find_value(children, fn
+      {^tag, _, [value]} -> to_string(value)
+      _ -> nil
+    end)
+  end
+
+  defp find_mi_data_item(children, tag) do
+    Enum.find_value(children, fn
+      {^tag, item_attrs, _} ->
+        item_attrs = format_attributes(item_attrs)
+        (item_attrs[:name] || item_attrs[:id] || "") |> to_string()
+
+      _ ->
+        nil
+    end)
+  end
+
+  defp load_standard_loop(elems) do
+    Enum.find_value(elems, fn
+      {"bpmn2:standardLoopCharacteristics", attrs, _children} ->
+        attrs = format_attributes(attrs)
+
+        %{
+          type: :standard_loop,
+          testBefore: (attrs[:testBefore] || "false") |> to_string(),
+          loopMaximum: attrs[:loopMaximum] && to_string(attrs[:loopMaximum])
+        }
+
+      _ ->
+        nil
+    end)
+  end
 
   # --- Lane parsing ---
 

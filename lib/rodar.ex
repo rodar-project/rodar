@@ -40,6 +40,7 @@ defmodule Rodar do
 
   require Logger
 
+  alias Rodar.Activity.MultiInstance
   alias Rodar.Activity.Subprocess
   alias Rodar.Activity.Subprocess.Embedded, as: SubprocessEmbedded
   alias Rodar.Activity.Task.Manual
@@ -190,7 +191,7 @@ defmodule Rodar do
 
     if activity_type?(type), do: pre_register_compensation(context, id)
 
-    result = Telemetry.node_span(span_metadata, fn -> dispatch(elem, context) end)
+    result = Telemetry.node_span(span_metadata, fn -> maybe_multi_instance(elem, context) end)
 
     Hooks.notify(context, :after_node, %{
       node_id: id,
@@ -223,6 +224,15 @@ defmodule Rodar do
     Context.put_meta(context, :current_token, token)
     dispatch(elem, context)
   end
+
+  defp maybe_multi_instance(
+         {_type, %{loop_characteristics: %{type: :multi_instance}}} = elem,
+         context
+       ) do
+    MultiInstance.execute(elem, context, &dispatch/2)
+  end
+
+  defp maybe_multi_instance(elem, context), do: dispatch(elem, context)
 
   defp dispatch({:bpmn_event_start, _} = elem, context),
     do: Start.token_in(elem, context)
