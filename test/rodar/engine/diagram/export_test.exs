@@ -243,7 +243,7 @@ defmodule Rodar.Engine.Diagram.ExportTest do
              id: "bound1",
              name: "Error",
              attachedToRef: "task1",
-             cancelActivity: "true",
+             cancelActivity: true,
              incoming: [],
              outgoing: ["f1"],
              messageEventDefinition: nil,

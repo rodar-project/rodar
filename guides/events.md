@@ -74,7 +74,7 @@ Timers are scheduled via `Process.send_after/3` and fire `{:timer_fired, ...}` o
 
 ## Boundary Events
 
-Boundary events attach to activities and trigger when specific conditions occur. The `cancelActivity` attribute controls whether the parent activity is interrupted.
+Boundary events attach to activities and trigger when specific conditions occur. The `cancelActivity` attribute (boolean, defaults to `true`) controls whether the parent activity is interrupted.
 
 | Boundary Type | Mechanism |
 |---------------|-----------|
@@ -85,6 +85,14 @@ Boundary events attach to activities and trigger when specific conditions occur.
 | Conditional | Subscribes to context data changes via `subscribe_condition/4` |
 | Escalation | Subscribes to the event bus for a matching escalation |
 | Compensate | Passive registration -- triggered during compensation |
+
+### Interrupting vs Non-Interrupting
+
+- **Interrupting** (`cancelActivity="true"`, the default) -- the parent activity is cancelled when the boundary fires. The boundary's outgoing path is taken exclusively.
+- **Non-interrupting** (`cancelActivity="false"`) -- the boundary fires its outgoing path in parallel while the parent activity continues. The boundary stays active and can fire again (e.g., timer cycles, repeated signals).
+- Error boundaries are always interrupting per BPMN spec, regardless of `cancelActivity`.
+
+The parser normalizes `cancelActivity` from an XML string to a boolean. When the attribute is absent from the BPMN XML, it defaults to `true`.
 
 ## Triggered Start Events
 

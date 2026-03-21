@@ -852,3 +852,34 @@ Rodar.Lane.find_lane_for_node(nil, "task1")  # => :error
 Rodar.Lane.node_lane_map(nil)                 # => %{}
 Rodar.Lane.all_lanes(nil)                      # => []
 ```
+
+## Boundary Events (Interrupting vs Non-Interrupting)
+
+Boundary events attach to activities. The `cancelActivity` attribute (boolean,
+defaults to `true`) controls whether the parent activity is interrupted when the
+boundary fires.
+
+```elixir
+# GOOD: Non-interrupting boundary event in BPMN XML
+# <bpmn:boundaryEvent id="Timer_1" attachedToRef="Task_1" cancelActivity="false">
+#   <bpmn:timerEventDefinition><bpmn:timeDuration>PT5M</bpmn:timeDuration></bpmn:timerEventDefinition>
+# </bpmn:boundaryEvent>
+#
+# The parser normalizes cancelActivity to a boolean:
+%{processes: [process]} = Rodar.Engine.Diagram.load(xml)
+{:bpmn_process, _, elements} = process
+{:bpmn_event_boundary, attrs} = elements["Timer_1"]
+attrs.cancelActivity  # => false (boolean, not string)
+
+# GOOD: Non-interrupting boundary fires its path WITHOUT cancelling the parent
+# The parent activity continues running; the boundary path runs in parallel
+
+# GOOD: Error boundaries are always interrupting per BPMN spec
+# Even with cancelActivity="false", error boundaries interrupt the parent
+
+# BAD: Expecting cancelActivity to be a string
+attrs.cancelActivity == "false"  # Wrong — it's a boolean now
+
+# BAD: Forgetting the default — cancelActivity defaults to true (interrupting)
+# If you omit cancelActivity in your BPMN XML, the boundary will interrupt
+```

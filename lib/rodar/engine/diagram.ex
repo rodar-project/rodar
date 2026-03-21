@@ -608,6 +608,7 @@ defmodule Rodar.Engine.Diagram do
        Map.merge(attrs, %{
          incoming: load_elements("bpmn2:incoming", elems),
          outgoing: load_elements("bpmn2:outgoing", elems),
+         cancelActivity: parse_cancel_activity(attrs[:cancelActivity]),
          conditionalEventDefinition:
            load_first_element("bpmn2:conditionalEventDefinition", elems),
          compensateEventDefinition: load_first_element("bpmn2:compensateEventDefinition", elems),
@@ -631,6 +632,16 @@ defmodule Rodar.Engine.Diagram do
     do: {:bpmn_extension_elements, Map.merge(attrs, %{_elems: elems})}
 
   defp load_element(_type, _attrs, _elems), do: nil
+
+  # --- cancelActivity normalization ---
+
+  defp parse_cancel_activity(nil), do: true
+  defp parse_cancel_activity(~c"false"), do: false
+  defp parse_cancel_activity(~c"true"), do: true
+  defp parse_cancel_activity("false"), do: false
+  defp parse_cancel_activity("true"), do: true
+  defp parse_cancel_activity(val) when is_boolean(val), do: val
+  defp parse_cancel_activity(_), do: true
 
   # --- Lane parsing ---
 
