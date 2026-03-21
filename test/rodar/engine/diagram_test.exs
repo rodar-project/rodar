@@ -75,7 +75,7 @@ defmodule Rodar.Engine.DiagramTest do
       assert {:bpmn_event_boundary, attrs} = elements["Boundary_1"]
       assert attrs.outgoing == ["Flow_3"]
       assert attrs.attachedToRef == "Task_1"
-      assert attrs.cancelActivity == "true"
+      assert attrs.cancelActivity == true
     end
   end
 

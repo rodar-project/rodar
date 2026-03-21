@@ -12,6 +12,22 @@ defmodule Rodar.Event.Boundary do
   - **Timer** — schedules a timer callback
   - **Escalation** — subscribes to the event bus for a matching escalation
 
+  ## Interrupting vs Non-Interrupting
+
+  The `cancelActivity` attribute (boolean, defaults to `true`) controls whether
+  a boundary event interrupts its parent activity:
+
+  - **Interrupting** (`cancelActivity: true`, the default) — when the boundary
+    fires, the parent activity is cancelled and the boundary's outgoing path
+    is taken exclusively.
+  - **Non-interrupting** (`cancelActivity: false`) — the boundary fires its
+    outgoing path in parallel while the parent activity continues executing.
+    The boundary event stays active and can fire again (relevant for signals
+    and timer cycles).
+
+  Error boundary events are always interrupting per the BPMN spec, regardless
+  of the `cancelActivity` value.
+
   ## Examples
 
       iex> end_event = {:bpmn_event_end, %{id: "end", incoming: ["flow"], outgoing: []}}
@@ -34,24 +50,26 @@ defmodule Rodar.Event.Boundary do
   """
   @spec token_in(Rodar.element(), Rodar.context()) :: Rodar.result()
   def token_in({:bpmn_event_boundary, %{id: id, outgoing: outgoing} = attrs}, context) do
+    cancel_activity = Map.get(attrs, :cancelActivity, true)
+
     cond do
       has_error?(attrs) ->
         handle_error_boundary(id, outgoing, context)
 
       has_message?(attrs) ->
-        handle_message_boundary(id, attrs, outgoing, context)
+        handle_message_boundary(id, attrs, outgoing, context, cancel_activity)
 
       has_signal?(attrs) ->
-        handle_signal_boundary(id, attrs, outgoing, context)
+        handle_signal_boundary(id, attrs, outgoing, context, cancel_activity)
 
       has_timer?(attrs) ->
-        handle_timer_boundary(id, attrs, outgoing, context)
+        handle_timer_boundary(id, attrs, outgoing, context, cancel_activity)
 
       has_escalation?(attrs) ->
-        handle_escalation_boundary(id, attrs, outgoing, context)
+        handle_escalation_boundary(id, attrs, outgoing, context, cancel_activity)
 
       has_conditional?(attrs) ->
-        handle_conditional_boundary(id, attrs, outgoing, context)
+        handle_conditional_boundary(id, attrs, outgoing, context, cancel_activity)
 
       has_compensate?(attrs) ->
         # Compensation boundary events are passive — handler registration
@@ -96,11 +114,16 @@ defmodule Rodar.Event.Boundary do
     Rodar.release_token(outgoing, context)
   end
 
-  defp handle_message_boundary(id, attrs, outgoing, context) do
+  defp handle_message_boundary(id, attrs, outgoing, context, cancel_activity) do
     {:bpmn_event_definition_message, def_attrs} = attrs.messageEventDefinition
     message_name = Map.get(def_attrs, :messageRef, id)
 
-    Context.put_meta(context, id, %{active: true, completed: false, type: :boundary_event})
+    Context.put_meta(context, id, %{
+      active: true,
+      completed: false,
+      type: :boundary_event,
+      cancel_activity: cancel_activity
+    })
 
     metadata = %{context: context, node_id: id, outgoing: outgoing}
     metadata = put_correlation(metadata, def_attrs, context)
@@ -110,11 +133,16 @@ defmodule Rodar.Event.Boundary do
     {:manual, %{id: id, type: :message_boundary, event_name: message_name, context: context}}
   end
 
-  defp handle_signal_boundary(id, attrs, outgoing, context) do
+  defp handle_signal_boundary(id, attrs, outgoing, context, cancel_activity) do
     {:bpmn_event_definition_signal, def_attrs} = attrs.signalEventDefinition
     signal_name = Map.get(def_attrs, :signalRef, id)
 
-    Context.put_meta(context, id, %{active: true, completed: false, type: :boundary_event})
+    Context.put_meta(context, id, %{
+      active: true,
+      completed: false,
+      type: :boundary_event,
+      cancel_activity: cancel_activity
+    })
 
     Bus.subscribe(:signal, signal_name, %{
       context: context,
@@ -125,10 +153,15 @@ defmodule Rodar.Event.Boundary do
     {:manual, %{id: id, type: :signal_boundary, event_name: signal_name, context: context}}
   end
 
-  defp handle_timer_boundary(id, attrs, outgoing, context) do
+  defp handle_timer_boundary(id, attrs, outgoing, context, cancel_activity) do
     {:bpmn_event_definition_timer, def_attrs} = attrs.timerEventDefinition
 
-    Context.put_meta(context, id, %{active: true, completed: false, type: :boundary_event})
+    Context.put_meta(context, id, %{
+      active: true,
+      completed: false,
+      type: :boundary_event,
+      cancel_activity: cancel_activity
+    })
 
     if Map.has_key?(def_attrs, :timeCycle) do
       schedule_boundary_cycle(id, def_attrs.timeCycle, outgoing, context)
@@ -141,13 +174,9 @@ defmodule Rodar.Event.Boundary do
     case Timer.parse_duration(duration) do
       {:ok, ms} ->
         timer_ref = Timer.schedule(ms, context, id, outgoing)
+        existing_meta = Context.get_meta(context, id) || %{}
 
-        Context.put_meta(context, id, %{
-          active: true,
-          completed: false,
-          type: :boundary_event,
-          timer_ref: timer_ref
-        })
+        Context.put_meta(context, id, Map.merge(existing_meta, %{timer_ref: timer_ref}))
 
         {:manual, %{id: id, type: :timer_boundary, duration_ms: ms, context: context}}
 
@@ -164,13 +193,9 @@ defmodule Rodar.Event.Boundary do
     case Timer.parse_cycle(cycle_expr) do
       {:ok, %{repetitions: reps, duration_ms: ms}} ->
         timer_ref = Timer.schedule_cycle(ms, context, id, outgoing, reps)
+        existing_meta = Context.get_meta(context, id) || %{}
 
-        Context.put_meta(context, id, %{
-          active: true,
-          completed: false,
-          type: :boundary_event,
-          timer_ref: timer_ref
-        })
+        Context.put_meta(context, id, Map.merge(existing_meta, %{timer_ref: timer_ref}))
 
         {:manual,
          %{
@@ -186,7 +211,7 @@ defmodule Rodar.Event.Boundary do
     end
   end
 
-  defp handle_conditional_boundary(id, attrs, outgoing, context) do
+  defp handle_conditional_boundary(id, attrs, outgoing, context, cancel_activity) do
     {:bpmn_event_definition_conditional, def_attrs} = attrs.conditionalEventDefinition
     condition = Map.get(def_attrs, :condition)
     language = Map.get(def_attrs, :condition_language, "elixir")
@@ -194,7 +219,12 @@ defmodule Rodar.Event.Boundary do
     if is_nil(condition) do
       {:error, "Boundary event '#{id}': conditional event has no condition expression"}
     else
-      Context.put_meta(context, id, %{active: true, completed: false, type: :boundary_event})
+      Context.put_meta(context, id, %{
+        active: true,
+        completed: false,
+        type: :boundary_event,
+        cancel_activity: cancel_activity
+      })
 
       Context.subscribe_condition(context, id, condition, %{
         node_id: id,
@@ -218,11 +248,16 @@ defmodule Rodar.Event.Boundary do
     end
   end
 
-  defp handle_escalation_boundary(id, attrs, outgoing, context) do
+  defp handle_escalation_boundary(id, attrs, outgoing, context, cancel_activity) do
     {:bpmn_event_definition_escalation, def_attrs} = attrs.escalationEventDefinition
     escalation_code = Map.get(def_attrs, :escalationRef, id)
 
-    Context.put_meta(context, id, %{active: true, completed: false, type: :boundary_event})
+    Context.put_meta(context, id, %{
+      active: true,
+      completed: false,
+      type: :boundary_event,
+      cancel_activity: cancel_activity
+    })
 
     Bus.subscribe(:escalation, escalation_code, %{
       context: context,

@@ -36,6 +36,14 @@ defmodule Rodar.Context do
   - `subscribe_condition/4` / `unsubscribe_condition/2` — Register expressions
     that are evaluated on every `put_data/3` call, firing `{:condition_met, ...}`
     when satisfied.
+
+  ## Non-Interrupting Boundary Events
+
+  The `handle_info` handlers for `:bpmn_event`, `:timer_fired`,
+  `:timer_cycle_fired`, and `:condition_met` check the node metadata for a
+  `cancel_activity` flag. When `cancel_activity` is `false` (non-interrupting),
+  the boundary event fires its outgoing path without marking the boundary node
+  as completed, allowing the parent activity to continue.
   """
 
   use GenServer
@@ -383,17 +391,37 @@ defmodule Rodar.Context do
 
   @impl true
   def handle_info({:condition_met, node_id, outgoing}, state) do
-    nodes = Map.put(state.nodes, node_id, %{active: false, completed: true, type: :catch_event})
-    subs = Map.delete(state.conditional_subscriptions, node_id)
-    new_state = %{state | nodes: nodes, conditional_subscriptions: subs}
+    meta = Map.get(state.nodes, node_id, %{})
+
+    new_state =
+      if non_interrupting?(meta) do
+        state
+      else
+        nodes =
+          Map.put(state.nodes, node_id, %{active: false, completed: true, type: :catch_event})
+
+        subs = Map.delete(state.conditional_subscriptions, node_id)
+        %{state | nodes: nodes, conditional_subscriptions: subs}
+      end
+
     context = self()
     spawn(fn -> Rodar.release_token(outgoing, context) end)
     {:noreply, new_state}
   end
 
   def handle_info({:timer_fired, node_id, outgoing}, state) do
-    nodes = Map.put(state.nodes, node_id, %{active: false, completed: true, type: :catch_event})
-    new_state = %{state | nodes: nodes}
+    meta = Map.get(state.nodes, node_id, %{})
+
+    new_state =
+      if non_interrupting?(meta) do
+        state
+      else
+        nodes =
+          Map.put(state.nodes, node_id, %{active: false, completed: true, type: :catch_event})
+
+        %{state | nodes: nodes}
+      end
+
     context = self()
     spawn(fn -> Rodar.release_token(outgoing, context) end)
     {:noreply, new_state}
@@ -413,13 +441,19 @@ defmodule Rodar.Context do
         timer_ref =
           Timer.schedule_cycle(duration_ms, context, node_id, outgoing, remaining)
 
+        existing_meta = Map.get(state.nodes, node_id, %{})
+
         nodes =
-          Map.put(state.nodes, node_id, %{
-            active: true,
-            completed: false,
-            type: :catch_event,
-            timer_ref: timer_ref
-          })
+          Map.put(
+            state.nodes,
+            node_id,
+            Map.merge(existing_meta, %{
+              active: true,
+              completed: false,
+              type: :catch_event,
+              timer_ref: timer_ref
+            })
+          )
 
         %{state | nodes: nodes}
       end
@@ -429,8 +463,18 @@ defmodule Rodar.Context do
 
   def handle_info({:bpmn_event, _type, _name, _payload, metadata}, state) do
     %{node_id: node_id, outgoing: outgoing, context: context} = metadata
-    nodes = Map.put(state.nodes, node_id, %{active: false, completed: true, type: :catch_event})
-    new_state = %{state | nodes: nodes}
+    meta = Map.get(state.nodes, node_id, %{})
+
+    new_state =
+      if non_interrupting?(meta) do
+        state
+      else
+        nodes =
+          Map.put(state.nodes, node_id, %{active: false, completed: true, type: :catch_event})
+
+        %{state | nodes: nodes}
+      end
+
     spawn(fn -> Rodar.release_token(outgoing, context) end)
     {:noreply, new_state}
   end
@@ -457,6 +501,10 @@ defmodule Rodar.Context do
       "feel" -> Feel.eval(expr, state.data)
       _ -> Sandbox.eval(expr, %{"data" => state.data})
     end
+  end
+
+  defp non_interrupting?(meta) do
+    Map.get(meta, :cancel_activity) == false
   end
 
   defp update_first_match([], _node_id, _token_id, _result_type), do: []
