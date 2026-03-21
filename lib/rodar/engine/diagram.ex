@@ -323,8 +323,13 @@ defmodule Rodar.Engine.Diagram do
 
   defp load_element("bpmn2:dataOutputAssociation", attrs, elems),
     do:
-      {:bpmn_output_set,
-       Map.merge(attrs, %{dataOutputRefs: load_elements("bpmn2:dataOutputRefs", elems)})}
+      {:bpmn_data_output_association,
+       Map.merge(attrs, %{
+         dataOutputRefs: load_elements("bpmn2:dataOutputRefs", elems),
+         sourceRef: load_first_element("bpmn2:sourceRef", elems),
+         targetRef: load_first_element("bpmn2:targetRef", elems),
+         assignment: load_elements("bpmn2:assignment", elems)
+       })}
 
   defp load_element("bpmn2:ioSpecification", attrs, elems),
     do:
@@ -475,7 +480,10 @@ defmodule Rodar.Engine.Diagram do
       {:bpmn_activity_task_service,
        Map.merge(attrs, %{
          incoming: load_elements("bpmn2:incoming", elems),
-         outgoing: load_elements("bpmn2:outgoing", elems)
+         outgoing: load_elements("bpmn2:outgoing", elems),
+         ioSpecification: load_elements("bpmn2:ioSpecification", elems),
+         dataInputAssociation: load_elements("bpmn2:dataInputAssociation", elems),
+         dataOutputAssociation: load_elements("bpmn2:dataOutputAssociation", elems)
        })}
 
   defp load_element("bpmn2:userTask", attrs, elems),

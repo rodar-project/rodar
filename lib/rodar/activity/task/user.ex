@@ -18,17 +18,26 @@ defmodule Rodar.Activity.Task.User do
 
   @doc """
   Receive the token for the element. Pauses execution and returns task data.
+
+  When the element has an `ioSpecification`, only the mapped input data is
+  included in the returned task data under the `:data` key. Otherwise, the
+  full context data is available.
   """
   @spec token_in(Rodar.element(), Rodar.context()) :: Rodar.result()
   def token_in(
         {:bpmn_activity_task_user, %{id: id, outgoing: outgoing} = attrs},
         context
       ) do
+    alias Rodar.Activity.DataMapper
+
+    mapped_data = DataMapper.map_inputs(attrs, context)
+
     task_data = %{
       id: id,
       name: Map.get(attrs, :name),
       outgoing: outgoing,
-      context: context
+      context: context,
+      data: mapped_data
     }
 
     Rodar.Context.put_meta(context, id, %{active: true, completed: false, type: :user_task})
@@ -39,15 +48,16 @@ defmodule Rodar.Activity.Task.User do
   @doc """
   Resume execution of a paused user task with the provided input data.
 
-  The `input` map is merged into the context data, and the token is released
-  to the outgoing flows.
+  When the element has an `ioSpecification` with data output associations,
+  the `input` map keys are mapped through those associations before being
+  written to the context. Otherwise, all input keys are merged directly.
   """
   @spec resume(Rodar.element(), Rodar.context(), map()) :: Rodar.result()
-  def resume({:bpmn_activity_task_user, %{id: id, outgoing: outgoing}}, context, input)
+  def resume({:bpmn_activity_task_user, %{id: id, outgoing: outgoing} = attrs}, context, input)
       when is_map(input) do
-    Enum.each(input, fn {key, value} ->
-      Rodar.Context.put_data(context, key, value)
-    end)
+    alias Rodar.Activity.DataMapper
+
+    DataMapper.map_outputs(attrs, input, context)
 
     Rodar.Context.put_meta(context, id, %{active: false, completed: true, type: :user_task})
 

@@ -714,7 +714,7 @@ defmodule Rodar.Engine.Diagram.Export do
     tag("bpmn2:dataInputAssociation", xml_attrs, children, depth)
   end
 
-  defp build_data_output_association({:bpmn_output_set, assoc_attrs}, depth) do
+  defp build_data_output_association({:bpmn_data_output_association, assoc_attrs}, depth) do
     xml_attrs =
       assoc_attrs
       |> Map.take([:id])
@@ -722,11 +722,16 @@ defmodule Rodar.Engine.Diagram.Export do
       |> sort_attrs()
       |> build_attrs()
 
+    source_ref = build_source_target_ref(:sourceRef, assoc_attrs, depth + 1)
+    target_ref = build_source_target_ref(:targetRef, assoc_attrs, depth + 1)
+
     refs =
       Map.get(assoc_attrs, :dataOutputRefs, [])
       |> Enum.map(&text_tag("bpmn2:dataOutputRefs", "", &1, depth + 1))
 
-    tag("bpmn2:dataOutputAssociation", xml_attrs, refs, depth)
+    children = source_ref ++ target_ref ++ refs
+
+    tag("bpmn2:dataOutputAssociation", xml_attrs, children, depth)
   end
 
   defp build_source_target_ref(key, attrs, depth) do
