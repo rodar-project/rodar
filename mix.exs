@@ -56,7 +56,7 @@ defmodule Rodar.MixProject do
       {:erlsom, "~> 1.5"},
       {:rodar_feel, path: "../feel"},
       {:telemetry, "~> 1.2"},
-      {:rodar_release, github: "rodar-project/rodar_release", only: :dev, runtime: false}
+      {:rodar_release, "~> 1.2", only: :dev, runtime: false}
     ]
   end
 
