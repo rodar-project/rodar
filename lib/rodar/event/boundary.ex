@@ -50,70 +50,55 @@ defmodule Rodar.Event.Boundary do
   """
   @spec token_in(Rodar.element(), Rodar.context()) :: Rodar.result()
   def token_in({:bpmn_event_boundary, %{id: id, outgoing: outgoing} = attrs}, context) do
-    cancel_activity = Map.get(attrs, :cancelActivity, true)
+    dispatch_boundary(id, attrs, outgoing, context)
+  end
 
-    cond do
-      has_error?(attrs) ->
-        handle_error_boundary(outgoing, context)
-
-      has_message?(attrs) ->
-        handle_message_boundary(id, attrs, outgoing, context, cancel_activity)
-
-      has_signal?(attrs) ->
-        handle_signal_boundary(id, attrs, outgoing, context, cancel_activity)
-
-      has_timer?(attrs) ->
-        handle_timer_boundary(id, attrs, outgoing, context, cancel_activity)
-
-      has_escalation?(attrs) ->
-        handle_escalation_boundary(id, attrs, outgoing, context, cancel_activity)
-
-      has_conditional?(attrs) ->
-        handle_conditional_boundary(id, attrs, outgoing, context, cancel_activity)
-
-      has_cancel?(attrs) ->
-        handle_cancel_boundary(outgoing, context)
-
-      has_compensate?(attrs) ->
-        # Compensation boundary events are passive — handler registration
-        # happens in Rodar.execute/3 when the attached activity completes
-        {:ok, context}
-
-      true ->
-        {:error, "Boundary event '#{id}': unsupported event definition"}
+  defp dispatch_boundary(id, attrs, outgoing, context) do
+    case event_type(attrs) do
+      :error -> handle_error_boundary(outgoing, context)
+      :cancel -> handle_cancel_boundary(outgoing, context)
+      :compensate -> {:ok, context}
+      :unsupported -> {:error, "Boundary event '#{id}': unsupported event definition"}
+      type -> dispatch_subscribable(type, id, attrs, outgoing, context)
     end
   end
 
-  defp has_error?(attrs) do
-    match?({:bpmn_event_definition_error, _}, Map.get(attrs, :errorEventDefinition))
+  defp dispatch_subscribable(type, id, attrs, outgoing, context) do
+    cancel_activity = Map.get(attrs, :cancelActivity, true)
+
+    case type do
+      :message -> handle_message_boundary(id, attrs, outgoing, context, cancel_activity)
+      :signal -> handle_signal_boundary(id, attrs, outgoing, context, cancel_activity)
+      :timer -> handle_timer_boundary(id, attrs, outgoing, context, cancel_activity)
+      :escalation -> handle_escalation_boundary(id, attrs, outgoing, context, cancel_activity)
+      :conditional -> handle_conditional_boundary(id, attrs, outgoing, context, cancel_activity)
+    end
   end
 
-  defp has_message?(attrs) do
-    match?({:bpmn_event_definition_message, _}, Map.get(attrs, :messageEventDefinition))
+  @event_definition_keys [
+    {:errorEventDefinition, :error},
+    {:messageEventDefinition, :message},
+    {:signalEventDefinition, :signal},
+    {:timerEventDefinition, :timer},
+    {:escalationEventDefinition, :escalation},
+    {:conditionalEventDefinition, :conditional},
+    {:cancelEventDefinition, :cancel},
+    {:compensateEventDefinition, :compensate}
+  ]
+
+  defp event_type(attrs) do
+    Enum.find_value(@event_definition_keys, :unsupported, fn {key, type} ->
+      has_event_definition?(attrs, key) && type
+    end)
   end
 
-  defp has_signal?(attrs) do
-    match?({:bpmn_event_definition_signal, _}, Map.get(attrs, :signalEventDefinition))
-  end
-
-  defp has_timer?(attrs) do
-    match?({:bpmn_event_definition_timer, _}, Map.get(attrs, :timerEventDefinition))
-  end
-
-  defp has_escalation?(attrs) do
-    match?({:bpmn_event_definition_escalation, _}, Map.get(attrs, :escalationEventDefinition))
-  end
-
-  defp has_conditional?(attrs) do
-    match?({:bpmn_event_definition_conditional, _}, Map.get(attrs, :conditionalEventDefinition))
-  end
-
-  defp has_cancel?(attrs) do
-    match?({:bpmn_event_definition_cancel, _}, Map.get(attrs, :cancelEventDefinition))
-  end
-
-  defp has_compensate?(attrs) do
-    match?({:bpmn_event_definition_compensate, _}, Map.get(attrs, :compensateEventDefinition))
+  defp has_event_definition?(attrs, key) do
+    case Map.get(attrs, key) do
+      nil -> false
+      {_, _} -> true
+      %{} -> true
+      _ -> false
+    end
   end
 
   # Error boundaries are activated directly by the parent activity

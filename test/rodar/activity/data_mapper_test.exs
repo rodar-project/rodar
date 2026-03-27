@@ -2,6 +2,8 @@ defmodule Rodar.Activity.DataMapperTest do
   use ExUnit.Case, async: true
 
   alias Rodar.Activity.DataMapper
+  alias Rodar.Activity.Task.Service
+  alias Rodar.Activity.Task.User
   alias Rodar.Context
 
   # Helper to build a minimal process with an end event and flow
@@ -270,7 +272,7 @@ defmodule Rodar.Activity.DataMapperTest do
            dataOutputAssociation: [output_assoc("echoed", "was_echoed")]
          }}
 
-      {:ok, _ctx} = Rodar.Activity.Task.Service.token_in(elem, ctx)
+      {:ok, _ctx} = Service.token_in(elem, ctx)
 
       assert_received {:captured_data, captured}
       assert captured == %{"mapped_id" => 42}
@@ -307,7 +309,7 @@ defmodule Rodar.Activity.DataMapperTest do
            dataOutputAssociation: []
          }}
 
-      {:ok, _ctx} = Rodar.Activity.Task.Service.token_in(elem, ctx)
+      {:ok, _ctx} = Service.token_in(elem, ctx)
 
       assert_received {:full_data, data}
       assert data == %{"order_id" => 42, "secret" => "visible"}
@@ -335,13 +337,13 @@ defmodule Rodar.Activity.DataMapperTest do
            dataOutputAssociation: [output_assoc("approved", "is_approved")]
          }}
 
-      {:manual, task_data} = Rodar.Activity.Task.User.token_in(elem, ctx)
+      {:manual, task_data} = User.token_in(elem, ctx)
 
       assert task_data.data == %{"user_name" => "Alice"}
       refute Map.has_key?(task_data.data, "internal")
 
       # Resume with output mapping
-      {:ok, _ctx} = Rodar.Activity.Task.User.resume(elem, ctx, %{"approved" => true})
+      {:ok, _ctx} = User.resume(elem, ctx, %{"approved" => true})
 
       assert Context.get_data(ctx, "is_approved") == true
       assert Context.get_data(ctx, "approved") == nil
@@ -363,7 +365,7 @@ defmodule Rodar.Activity.DataMapperTest do
            dataOutputAssociation: []
          }}
 
-      {:manual, task_data} = Rodar.Activity.Task.User.token_in(elem, ctx)
+      {:manual, task_data} = User.token_in(elem, ctx)
 
       assert task_data.data == %{"name" => "Alice"}
     end

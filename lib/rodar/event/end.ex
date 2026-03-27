@@ -47,36 +47,7 @@ defmodule Rodar.Event.End do
   """
   @spec token_in(Rodar.element(), Rodar.context()) :: Rodar.result()
   def token_in({:bpmn_event_end, attrs} = _elem, context) do
-    result =
-      cond do
-        has_error_definition?(attrs) ->
-          handle_error(attrs, context)
-
-        has_terminate_definition?(attrs) ->
-          handle_terminate(context)
-
-        has_compensate_definition?(attrs) ->
-          handle_compensate(attrs, context)
-
-        has_message?(attrs) ->
-          publish_message(attrs, context)
-          {:ok, context}
-
-        has_signal?(attrs) ->
-          publish_signal(attrs, context)
-          {:ok, context}
-
-        has_escalation?(attrs) ->
-          publish_escalation(attrs, context)
-          {:ok, context}
-
-        has_cancel_definition?(attrs) ->
-          handle_cancel(context)
-
-        true ->
-          {:ok, context}
-      end
-
+    result = dispatch_end_event(attrs, context)
     node_id = Map.get(attrs, :id)
 
     if match?({:ok, _}, result) do
@@ -84,6 +55,37 @@ defmodule Rodar.Event.End do
     end
 
     result
+  end
+
+  defp dispatch_end_event(attrs, context) do
+    cond do
+      has_error_definition?(attrs) ->
+        handle_error(attrs, context)
+
+      has_terminate_definition?(attrs) ->
+        handle_terminate(context)
+
+      has_compensate_definition?(attrs) ->
+        handle_compensate(attrs, context)
+
+      has_message?(attrs) ->
+        publish_message(attrs, context)
+        {:ok, context}
+
+      has_signal?(attrs) ->
+        publish_signal(attrs, context)
+        {:ok, context}
+
+      has_escalation?(attrs) ->
+        publish_escalation(attrs, context)
+        {:ok, context}
+
+      has_cancel_definition?(attrs) ->
+        handle_cancel(context)
+
+      true ->
+        {:ok, context}
+    end
   end
 
   defp has_error_definition?(attrs) do

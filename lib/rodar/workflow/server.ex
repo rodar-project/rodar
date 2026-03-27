@@ -95,8 +95,24 @@ defmodule Rodar.Workflow.Server do
 
       @__server_opts__ unquote(opts)
 
-      # --- Client API ---
+      unquote(__client_api__())
+      unquote(__server_callbacks__(opts))
 
+      defoverridable start_link: 0,
+                     start_link: 1,
+                     create_instance: 0,
+                     create_instance: 1,
+                     complete_task: 3,
+                     complete_service_task: 3,
+                     list_instances: 0,
+                     get_instance: 1,
+                     init: 1,
+                     handle_call: 3
+    end
+  end
+
+  defp __client_api__ do
+    quote do
       @doc false
       def start_link(opts \\ []) do
         name = Keyword.get(opts, :name, __MODULE__)
@@ -130,9 +146,11 @@ defmodule Rodar.Workflow.Server do
       def get_instance(instance_id) do
         GenServer.call(__MODULE__, {:__workflow__, :get_instance, instance_id})
       end
+    end
+  end
 
-      # --- GenServer Callbacks ---
-
+  defp __server_callbacks__(_opts) do
+    quote do
       @impl GenServer
       def init(_opts) do
         case setup() do
@@ -144,6 +162,17 @@ defmodule Rodar.Workflow.Server do
         end
       end
 
+      unquote(__handle_call_create__())
+      unquote(__handle_call_complete_task__())
+      unquote(__handle_call_complete_service__())
+      unquote(__handle_call_queries__())
+    end
+  end
+
+  defp __handle_call_create__ do
+    server_module = __MODULE__
+
+    quote do
       @impl GenServer
       def handle_call({:__workflow__, :create_instance, params}, _from, state) do
         next_id = state.counter + 1
@@ -154,7 +183,7 @@ defmodule Rodar.Workflow.Server do
         case Rodar.Workflow.start_process(process_id, data) do
           {:ok, pid} ->
             status = Rodar.Workflow.process_status(pid)
-            mapped = unquote(__MODULE__).__apply_map_status__(__MODULE__, status)
+            mapped = unquote(server_module).__apply_map_status__(__MODULE__, status)
 
             instance = %{
               id: next_id,
@@ -171,7 +200,13 @@ defmodule Rodar.Workflow.Server do
             {:reply, error, state}
         end
       end
+    end
+  end
 
+  defp __handle_call_complete_task__ do
+    server_module = __MODULE__
+
+    quote do
       def handle_call(
             {:__workflow__, :complete_task, instance_id, task_id, input},
             _from,
@@ -185,7 +220,7 @@ defmodule Rodar.Workflow.Server do
 
               _result ->
                 status = Rodar.Workflow.process_status(instance.process_pid)
-                mapped = unquote(__MODULE__).__apply_map_status__(__MODULE__, status)
+                mapped = unquote(server_module).__apply_map_status__(__MODULE__, status)
 
                 updated = %{instance | status: mapped}
                 instances = Map.put(state.instances, instance_id, updated)
@@ -196,7 +231,13 @@ defmodule Rodar.Workflow.Server do
             {:reply, {:error, :not_found}, state}
         end
       end
+    end
+  end
 
+  defp __handle_call_complete_service__ do
+    server_module = __MODULE__
+
+    quote do
       def handle_call(
             {:__workflow__, :complete_service_task, instance_id, task_id, result},
             _from,
@@ -214,7 +255,7 @@ defmodule Rodar.Workflow.Server do
 
               _result ->
                 status = Rodar.Workflow.process_status(instance.process_pid)
-                mapped = unquote(__MODULE__).__apply_map_status__(__MODULE__, status)
+                mapped = unquote(server_module).__apply_map_status__(__MODULE__, status)
 
                 updated = %{instance | status: mapped}
                 instances = Map.put(state.instances, instance_id, updated)
@@ -225,7 +266,11 @@ defmodule Rodar.Workflow.Server do
             {:reply, {:error, :not_found}, state}
         end
       end
+    end
+  end
 
+  defp __handle_call_queries__ do
+    quote do
       def handle_call({:__workflow__, :list_instances}, _from, state) do
         sorted =
           state.instances
@@ -241,17 +286,6 @@ defmodule Rodar.Workflow.Server do
           :error -> {:reply, {:error, :not_found}, state}
         end
       end
-
-      defoverridable start_link: 0,
-                     start_link: 1,
-                     create_instance: 0,
-                     create_instance: 1,
-                     complete_task: 3,
-                     complete_service_task: 3,
-                     list_instances: 0,
-                     get_instance: 1,
-                     init: 1,
-                     handle_call: 3
     end
   end
 end

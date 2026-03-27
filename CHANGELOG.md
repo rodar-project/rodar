@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Switch `rodar_feel` dependency from local path to hex.pm package (`~> 0.2`)
+- Refactor `Rodar.Event.Boundary` to use data-driven event type lookup instead of `cond` with individual `has_*?/1` guards
+- Refactor `Rodar.Event.End.token_in/2` to extract `dispatch_end_event/2` helper
+- Refactor `Rodar.Activity.DataMapper` to extract `resolve_single_input/3` and `apply_single_output/3` helpers
+- Refactor `Rodar.Workflow.Server` `__using__` macro into smaller quoted blocks
 
 ## [1.4.2] - 2026-03-27
 

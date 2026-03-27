@@ -123,18 +123,22 @@ defmodule Rodar.Activity.DataMapper do
       if assignments != [] do
         apply_input_assignments(assignments, data, acc)
       else
-        source_key = resolve_ref(Map.get(assoc_attrs, :sourceRef))
-        target_key = resolve_ref(Map.get(assoc_attrs, :targetRef))
-        key = target_key || source_key
-
-        if key do
-          value = get_data_value(data, source_key)
-          Map.put(acc, key, value)
-        else
-          acc
-        end
+        resolve_single_input(assoc_attrs, data, acc)
       end
     end)
+  end
+
+  defp resolve_single_input(assoc_attrs, data, acc) do
+    source_key = resolve_ref(Map.get(assoc_attrs, :sourceRef))
+    target_key = resolve_ref(Map.get(assoc_attrs, :targetRef))
+    key = target_key || source_key
+
+    if key do
+      value = get_data_value(data, source_key)
+      Map.put(acc, key, value)
+    else
+      acc
+    end
   end
 
   defp apply_input_assignments(assignments, data, acc) do
@@ -159,15 +163,19 @@ defmodule Rodar.Activity.DataMapper do
       if assignments != [] do
         apply_output_assignments(assignments, result, context)
       else
-        source_key = resolve_ref(Map.get(assoc_attrs, :sourceRef))
-        target_key = resolve_ref(Map.get(assoc_attrs, :targetRef))
-
-        if source_key && target_key do
-          value = get_result_value(result, source_key)
-          Context.put_data(context, target_key, value)
-        end
+        apply_single_output(assoc_attrs, result, context)
       end
     end)
+  end
+
+  defp apply_single_output(assoc_attrs, result, context) do
+    source_key = resolve_ref(Map.get(assoc_attrs, :sourceRef))
+    target_key = resolve_ref(Map.get(assoc_attrs, :targetRef))
+
+    if source_key && target_key do
+      value = get_result_value(result, source_key)
+      Context.put_data(context, target_key, value)
+    end
   end
 
   defp apply_output_assignments(assignments, result, context) do
