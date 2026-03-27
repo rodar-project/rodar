@@ -4,7 +4,7 @@ defmodule Rodar.MixProject do
   def project do
     [
       app: :rodar,
-      version: "1.4.1",
+      version: "1.4.2",
       elixir: "~> 1.16",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
