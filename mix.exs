@@ -54,7 +54,7 @@ defmodule Rodar.MixProject do
       {:excoveralls, "~> 0.18", only: [:dev, :test], runtime: false},
       {:jason, "~> 1.4"},
       {:erlsom, "~> 1.5"},
-      {:rodar_feel, path: "../feel"},
+      {:rodar_feel, "~> 0.2"},
       {:telemetry, "~> 1.2"},
       {:rodar_release, "~> 1.2", only: :dev, runtime: false}
     ]
