@@ -82,12 +82,12 @@ end
 
 ### Workflow API
 
-For most applications, the Workflow API eliminates boilerplate. Layer 1 (`RodarBpmn.Workflow`) provides a functional API; Layer 2 (`RodarBpmn.Workflow.Server`) adds a GenServer with instance tracking.
+For most applications, the Workflow API eliminates boilerplate. Layer 1 (`Rodar.Workflow`) provides a functional API; Layer 2 (`Rodar.Workflow.Server`) adds a GenServer with instance tracking.
 
 ```elixir
 # Layer 1 — functional API via `use` macro
 defmodule MyApp.OrderWorkflow do
-  use RodarBpmn.Workflow,
+  use Rodar.Workflow,
     bpmn_file: "priv/bpmn/order_processing.bpmn",
     process_id: "order_processing",
     otp_app: :my_app
@@ -101,12 +101,12 @@ MyApp.OrderWorkflow.process_status(pid)
 ```elixir
 # Layer 2 — GenServer with instance tracking
 defmodule MyApp.OrderManager do
-  use RodarBpmn.Workflow.Server,
+  use Rodar.Workflow.Server,
     bpmn_file: "priv/bpmn/order_processing.bpmn",
     process_id: "order_processing",
     otp_app: :my_app
 
-  @impl RodarBpmn.Workflow.Server
+  @impl Rodar.Workflow.Server
   def init_data(params, instance_id) do
     %{"customer" => params["customer"], "order_id" => instance_id}
   end

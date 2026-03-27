@@ -2,7 +2,7 @@
 
 The Workflow API provides two layers of abstraction over the core BPMN engine, eliminating boilerplate for the most common patterns: loading a BPMN file, registering it, creating process instances, and resuming user tasks.
 
-## Layer 1: `RodarBpmn.Workflow`
+## Layer 1: `Rodar.Workflow`
 
 A functional API (plus an optional `use` macro) that wraps the steps you would otherwise repeat in every module: read XML, parse, register, discover handlers, create an instance, activate.
 
@@ -10,7 +10,7 @@ A functional API (plus an optional `use` macro) that wraps the steps you would o
 
 ```elixir
 defmodule MyApp.OrderWorkflow do
-  use RodarBpmn.Workflow,
+  use Rodar.Workflow,
     bpmn_file: "priv/bpmn/order_processing.bpmn",
     process_id: "order_processing",
     otp_app: :my_app,           # optional — resolves path via Application.app_dir
@@ -32,7 +32,7 @@ All injected functions are `defoverridable`, so you can customize any of them:
 
 ```elixir
 defmodule MyApp.OrderWorkflow do
-  use RodarBpmn.Workflow,
+  use Rodar.Workflow,
     bpmn_file: "priv/bpmn/order_processing.bpmn",
     process_id: "order_processing"
 
@@ -50,19 +50,19 @@ You can skip the `use` macro and call the module functions directly:
 
 ```elixir
 # Setup — load, register, discover handlers
-{:ok, diagram} = RodarBpmn.Workflow.setup(
+{:ok, diagram} = Rodar.Workflow.setup(
   bpmn_file: "priv/bpmn/order.bpmn",
   process_id: "order"
 )
 
 # Create and activate a process instance
-{:ok, pid} = RodarBpmn.Workflow.start_process("order", %{"item" => "widget"})
+{:ok, pid} = Rodar.Workflow.start_process("order", %{"item" => "widget"})
 
 # Check status
-:suspended = RodarBpmn.Workflow.process_status(pid)
+:suspended = Rodar.Workflow.process_status(pid)
 
 # Resume a user task
-RodarBpmn.Workflow.resume_user_task(pid, "Task_Approval", %{"approved" => true})
+Rodar.Workflow.resume_user_task(pid, "Task_Approval", %{"approved" => true})
 ```
 
 ### Function Reference
@@ -84,10 +84,10 @@ Returns `{:ok, diagram}` on success, `{:error, reason}` on failure.
 
 Creates a process instance with data, then activates it.
 
-Unlike `RodarBpmn.Process.create_and_run/2` which passes data at creation time and activates immediately, `start_process/2` sets each data key individually via `Context.put_data/3` **before** calling `activate/1`. This ensures data is available to the start event and any immediately-reached nodes.
+Unlike `Rodar.Process.create_and_run/2` which passes data at creation time and activates immediately, `start_process/2` sets each data key individually via `Context.put_data/3` **before** calling `activate/1`. This ensures data is available to the start event and any immediately-reached nodes.
 
 ```elixir
-{:ok, pid} = RodarBpmn.Workflow.start_process("order", %{
+{:ok, pid} = Rodar.Workflow.start_process("order", %{
   "customer" => "alice",
   "total" => 99
 })
@@ -95,10 +95,10 @@ Unlike `RodarBpmn.Process.create_and_run/2` which passes data at creation time a
 
 #### `resume_user_task/3`
 
-Resumes a paused user task on a process instance. Looks up the task element in the process map, verifies it is a user task, and delegates to `RodarBpmn.Activity.Task.User.resume/3`.
+Resumes a paused user task on a process instance. Looks up the task element in the process map, verifies it is a user task, and delegates to `Rodar.Activity.Task.User.resume/3`.
 
 ```elixir
-result = RodarBpmn.Workflow.resume_user_task(pid, "Task_Approval", %{
+result = Rodar.Workflow.resume_user_task(pid, "Task_Approval", %{
   "approved" => true
 })
 ```
@@ -109,17 +109,17 @@ Returns `{:error, reason}` if the task is not found or is not a user task.
 
 Returns the current status of a process instance with **smart completion detection**.
 
-When the underlying `RodarBpmn.Process` reports `:suspended` (which happens when a user task pauses execution during initial activation), this function inspects the context nodes. If no nodes are currently active, the process has actually completed (for example, after an external `resume_user_task` call ran the process to its end event), so `:completed` is returned instead of `:suspended`.
+When the underlying `Rodar.Process` reports `:suspended` (which happens when a user task pauses execution during initial activation), this function inspects the context nodes. If no nodes are currently active, the process has actually completed (for example, after an external `resume_user_task` call ran the process to its end event), so `:completed` is returned instead of `:suspended`.
 
 ```elixir
-{:ok, pid} = RodarBpmn.Workflow.start_process("order", %{"item" => "widget"})
+{:ok, pid} = Rodar.Workflow.start_process("order", %{"item" => "widget"})
 
 # Process hits a user task during activation — status is :suspended
-:suspended = RodarBpmn.Workflow.process_status(pid)
+:suspended = Rodar.Workflow.process_status(pid)
 
 # After resuming the user task, the process runs to completion
-RodarBpmn.Workflow.resume_user_task(pid, "Task_Approval", %{"approved" => true})
-:completed = RodarBpmn.Workflow.process_status(pid)
+Rodar.Workflow.resume_user_task(pid, "Task_Approval", %{"approved" => true})
+:completed = Rodar.Workflow.process_status(pid)
 ```
 
 #### `process_data/1`
@@ -127,7 +127,7 @@ RodarBpmn.Workflow.resume_user_task(pid, "Task_Approval", %{"approved" => true})
 Returns the current data map of a process instance.
 
 ```elixir
-data = RodarBpmn.Workflow.process_data(pid)
+data = Rodar.Workflow.process_data(pid)
 data["result"]
 # => "approved"
 ```
@@ -137,11 +137,11 @@ data["result"]
 Returns the execution history of a process instance.
 
 ```elixir
-history = RodarBpmn.Workflow.process_history(pid)
+history = Rodar.Workflow.process_history(pid)
 # => [%{node_id: "StartEvent_1", result: :ok, ...}, ...]
 ```
 
-## Layer 2: `RodarBpmn.Workflow.Server`
+## Layer 2: `Rodar.Workflow.Server`
 
 A GenServer abstraction that builds on Layer 1, adding instance tracking with sequential IDs and domain-specific status mapping. Use this when you need a long-lived process that manages multiple BPMN instances.
 
@@ -149,13 +149,13 @@ A GenServer abstraction that builds on Layer 1, adding instance tracking with se
 
 ```elixir
 defmodule MyApp.OrderManager do
-  use RodarBpmn.Workflow.Server,
+  use Rodar.Workflow.Server,
     bpmn_file: "priv/bpmn/order_processing.bpmn",
     process_id: "order_processing",
     otp_app: :my_app,
     app_name: "MyApp"
 
-  @impl RodarBpmn.Workflow.Server
+  @impl Rodar.Workflow.Server
   def init_data(params, instance_id) do
     %{
       "customer" => params["customer"],
@@ -164,7 +164,7 @@ defmodule MyApp.OrderManager do
   end
 
   # Optional — translate BPMN statuses to domain terms
-  @impl RodarBpmn.Workflow.Server
+  @impl Rodar.Workflow.Server
   def map_status(:suspended), do: :pending_approval
   def map_status(other), do: other
 
@@ -179,7 +179,7 @@ end
 Transforms the input parameters and a sequential instance ID into the BPMN process data map. Called during `create_instance/1` before activating the process.
 
 ```elixir
-@impl RodarBpmn.Workflow.Server
+@impl Rodar.Workflow.Server
 def init_data(params, instance_id) do
   %{
     "customer" => params["customer"],
@@ -196,7 +196,7 @@ The `instance_id` is a sequential integer (1, 2, 3, ...) assigned by the server.
 Translates BPMN process status atoms (`:created`, `:running`, `:suspended`, `:completed`, `:error`, `:terminated`) to domain-specific terms. Defaults to identity (returns the status unchanged).
 
 ```elixir
-@impl RodarBpmn.Workflow.Server
+@impl Rodar.Workflow.Server
 def map_status(:suspended), do: :pending_approval
 def map_status(:completed), do: :fulfilled
 def map_status(other), do: other
@@ -256,17 +256,17 @@ The recommended pattern is to wrap the injected functions with domain-specific n
 
 ```elixir
 defmodule MyApp.OrderManager do
-  use RodarBpmn.Workflow.Server,
+  use Rodar.Workflow.Server,
     bpmn_file: "priv/bpmn/order_processing.bpmn",
     process_id: "order_processing",
     otp_app: :my_app
 
-  @impl RodarBpmn.Workflow.Server
+  @impl Rodar.Workflow.Server
   def init_data(params, instance_id) do
     %{"customer" => params["customer"], "order_id" => instance_id}
   end
 
-  @impl RodarBpmn.Workflow.Server
+  @impl Rodar.Workflow.Server
   def map_status(:suspended), do: :pending_approval
   def map_status(:completed), do: :fulfilled
   def map_status(other), do: other
@@ -288,9 +288,9 @@ To find active user tasks on a process instance, inspect the context nodes for e
 
 ```elixir
 def pending_tasks(pid) do
-  context = RodarBpmn.Process.get_context(pid)
-  process_map = RodarBpmn.Context.get(context, :process)
-  nodes = RodarBpmn.Context.get(context, :nodes)
+  context = Rodar.Process.get_context(pid)
+  process_map = Rodar.Context.get(context, :process)
+  nodes = Rodar.Context.get(context, :nodes)
 
   nodes
   |> Enum.filter(fn
