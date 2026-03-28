@@ -26,10 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Parallel, inclusive, and complex gateway joins now fire correctly — `SequenceFlow.token_out` threads its flow ID through context meta so `dispatch/2` can pass it to `token_in/3`, enabling `record_token` instead of read-only `token_count`
-- `Rodar.dispatch/2` catch-all clauses now return `{:not_implemented}` instead of `nil` for unknown element types
+- `Rodar` `dispatch/2` catch-all clauses now return `{:not_implemented}` instead of `nil` for unknown element types
 - `Rodar.Workflow.setup/1` wraps `File.read` errors with descriptive messages including the file path
 - `Rodar.Workflow.Server` `init/1` wraps setup failures as `{:workflow_setup_failed, reason}` for clearer error origins
-- `Rodar.Workflow.Server.complete_task/3` now propagates errors from `resume_user_task` instead of silently discarding them
+- `Rodar.Workflow.Server` `complete_task/3` now propagates errors from `resume_user_task` instead of silently discarding them
 - `Diagram.load/2` `inject_handlers_into_elements/2` now recurses into embedded subprocesses, fixing handler injection for nested service tasks
 
 ### Changed
